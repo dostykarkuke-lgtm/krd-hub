@@ -992,18 +992,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Language Switch Quick Toggle */}
-      <div className="fixed bottom-4 right-4 z-40">
-        <button 
-          id="lang-quick-toggle"
-          onClick={() => handleSelectLanguage(lang === "en" ? "ckb" : "en")}
-          className="bg-black/90 hover:bg-cyan-950 border border-gray-800 p-2.5 rounded-full text-cyan-400 shadow-xl flex items-center gap-1.5 text-xs font-mono font-bold transition-all active:scale-95 cursor-pointer"
-          title="Switch Language"
-        >
-          <Globe className="w-4 h-4" />
-          <span>{lang === "en" ? "کوردی" : "EN"}</span>
-        </button>
-      </div>
+      {/* Language Switch Quick Toggle Relocated to Profile Screen Settings */}
 
       <div className={`w-full flex items-stretch justify-center gap-8 ${useDeviceFrame ? "max-w-6xl" : "max-w-none"}`}>
         {/* Desktop Left Console panel */}
@@ -1095,7 +1084,7 @@ export default function App() {
           </div>
 
           {/* Main viewport */}
-          <div className="flex-1 overflow-y-auto no-scrollbar relative bg-[#030303] flex flex-col">
+          <div className="flex-1 overflow-y-auto no-scrollbar relative bg-[#030303] flex flex-col pb-24">
             {/* LIGHTBOX PREVIEW */}
             {activeLightboxImage && (
               <div 
@@ -1780,6 +1769,45 @@ export default function App() {
                         </div>
                       </div>
 
+                      {/* Language Selection Toggle */}
+                      <div className="bg-black/60 border border-gray-900 rounded-xl p-4 space-y-3 text-left">
+                        <div className="flex items-center gap-2">
+                          <Globe className="w-4 h-4 text-cyan-400" />
+                          <h4 className="text-[10px] uppercase font-mono tracking-widest text-[#00f0ff] font-bold">
+                            {lang === "en" ? "App Language" : "زمانی ئەپ"}
+                          </h4>
+                        </div>
+                        <p className="text-[11px] text-gray-400">
+                          {lang === "en" 
+                            ? "Select your interface language for the workspace." 
+                            : "زمانی دڵخوازی خۆت دیاریبکە بۆ ڕووکاری کارکردنی ئەپەکە."}
+                        </p>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleSelectLanguage("en")}
+                            className={`py-2 px-3 text-xs font-mono font-bold rounded-lg border transition-all cursor-pointer ${
+                              lang === "en" 
+                                ? "bg-cyan-950/45 text-cyan-400 border-cyan-500/40" 
+                                : "bg-[#050505] text-gray-400 border-gray-900 hover:border-gray-800"
+                            }`}
+                          >
+                            English (EN)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSelectLanguage("ckb")}
+                            className={`py-2 px-3 text-xs font-semibold rounded-lg border transition-all cursor-pointer ${
+                              lang === "ckb" 
+                                ? "bg-cyan-950/45 text-cyan-400 border-cyan-500/40" 
+                                : "bg-[#050505] text-gray-400 border-gray-900 hover:border-gray-800"
+                            }`}
+                          >
+                            کوردی (CKB)
+                          </button>
+                        </div>
+                      </div>
+
                       <div className="bg-black/40 border border-gray-900 p-3.5 rounded-xl space-y-1.5">
                         <h4 className="text-[10px] uppercase font-mono tracking-widest text-cyan-400 font-bold">{currentT.bioTitle}</h4>
                         <p className="text-xs text-gray-300 leading-relaxed font-normal">{myProfile.bio}</p>
@@ -1817,7 +1845,10 @@ export default function App() {
           </div>
 
           {/* App primary bottom bar */}
-          <div className="bg-[#030303] border-t border-gray-900 h-16 shrink-0 flex items-stretch justify-around relative z-10">
+          <div 
+            style={{ position: 'fixed', bottom: 0, left: 0, width: '100%', zIndex: 50 }}
+            className="bg-[#030303]/95 backdrop-blur-md border-t border-gray-900 h-16 shrink-0 flex items-stretch justify-around"
+          >
             <button 
               id="nav-tab-biner"
               onClick={() => {
