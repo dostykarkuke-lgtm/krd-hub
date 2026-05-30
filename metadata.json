@@ -1,0 +1,6 @@
+{
+  "name": "Krd Hub",
+  "description": "Krd Hub is a comprehensive cinematic collaboration application to explore film works and find the best media crews.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
