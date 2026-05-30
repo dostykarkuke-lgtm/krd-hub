@@ -10,6 +10,7 @@ export interface Movie {
   indie: boolean;
   roleOpportunities?: string[];
   matchReason?: string;
+  createdAt?: number; // Dynamic relative time
 }
 
 export interface SakoPortfolioItem {
@@ -41,14 +42,23 @@ export interface ChatMessage {
   senderId: "me" | string; // 'me' is current user, otherwise creator's id
   text: string;
   timestamp: string; // Formatting localized time
+  mediaUrl?: string; // Optional image or video attachment
+  mediaType?: "image" | "video";
+  liveLocation?: {
+    lat: number;
+    lng: number;
+    expiresAt: number; // UTC time in ms
+  };
 }
 
 export interface ChatConversation {
   id: string;
-  creatorId: string;
+  creatorId: string; // For groups, can be a group key
   creatorName: string;
   creatorAvatar: string;
   creatorRole: string;
   messages: ChatMessage[];
   unread: boolean;
+  isGroup?: boolean;
+  groupMembers?: string[]; // IDs of creators in group
 }

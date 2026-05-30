@@ -17,12 +17,92 @@ import {
   Globe,
   Briefcase,
   ChevronLeft,
-  Sparkles
+  Sparkles,
+  Camera,
+  Clapperboard,
+  Heart,
+  Image as ImageIcon,
+  Navigation,
+  Volume2,
+  VolumeX,
+  UserPlus,
+  Share2
 } from "lucide-react";
 import { Movie, SakoCreator, SakoPortfolioItem, ChatConversation, ChatMessage } from "./types";
 import { initialTrendingMovies, initialCreators, initialConversations } from "./data";
 
 type Lang = "en" | "ckb";
+
+interface LocationBubbleProps {
+  lat: number;
+  lng: number;
+  expiresAt: number;
+  lang: "en" | "ckb";
+}
+
+const LiveLocationBubble: React.FC<LocationBubbleProps> = ({ lat, lng, expiresAt, lang }) => {
+  const [timeLeft, setTimeLeft] = useState<number>(() => Math.max(0, expiresAt - Date.now()));
+
+  useEffect(() => {
+    if (timeLeft <= 0) return;
+    const interval = setInterval(() => {
+      const remaining = expiresAt - Date.now();
+      if (remaining <= 0) {
+        setTimeLeft(0);
+        clearInterval(interval);
+      } else {
+        setTimeLeft(remaining);
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [expiresAt, timeLeft]);
+
+  const isExpired = timeLeft <= 0;
+
+  const formatTime = (ms: number) => {
+    const totalSecs = Math.floor(ms / 1000);
+    const mins = Math.floor(totalSecs / 60);
+    const secs = totalSecs % 60;
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
+
+  return (
+    <div className="space-y-1.5 p-1 w-44 text-xs font-mono text-left">
+      <div className="flex items-center gap-1.5 border-b border-gray-950 pb-1 mb-1 justify-between">
+        <span className="flex items-center gap-1 text-[9px] font-bold text-cyan-400">
+          <span className={`w-1.5 h-1.5 rounded-full ${isExpired ? "bg-red-500" : "bg-cyan-400 animate-pulse"}`} />
+          {isExpired 
+            ? (lang === "en" ? "EXPIRED" : "بەسەرچوو") 
+            : (lang === "en" ? "LIVE LOCATION" : "شوێنی ڕاستەوخۆ")}
+        </span>
+        {!isExpired && (
+          <span className="text-red-400 text-[9px] font-bold bg-red-950/40 px-1 py-0.5 rounded border border-red-900/30">
+            {formatTime(timeLeft)}
+          </span>
+        )}
+      </div>
+      
+      {!isExpired ? (
+        <div className="space-y-1 bg-black/40 p-1.5 rounded border border-cyan-950/40">
+          <div className="flex items-center gap-1 text-gray-300">
+            <MapPin className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+            <div>
+              <p className="text-[9px] text-gray-400">Lat: {lat.toFixed(4)}</p>
+              <p className="text-[9px] text-gray-400">Lng: {lng.toFixed(4)}</p>
+            </div>
+          </div>
+          <div className="text-[8px] text-cyan-400/85 animate-pulse text-center uppercase tracking-wider font-bold">
+            📡 {lang === "en" ? "Transmitting GPS..." : "سیگنال ناردرا..."}
+          </div>
+        </div>
+      ) : (
+        <div className="p-1 px-1.5 bg-gray-950 rounded text-center text-gray-600 border border-gray-900 text-[8px] uppercase tracking-wider font-bold">
+          🔒 {lang === "en" ? "Signal Expired" : "سیگناڵ بڕا"}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const t = {
   en: {
@@ -209,6 +289,373 @@ const t = {
   }
 };
 
+interface InstagramReelCardProps {
+  key?: any;
+  reel: any;
+  lang: "en" | "ckb" | null;
+  followingIds: string[];
+  setFollowingIds: React.Dispatch<React.SetStateAction<string[]>>;
+  setReels: React.Dispatch<React.SetStateAction<any[]>>;
+  creators: SakoCreator[];
+  setCreators: React.Dispatch<React.SetStateAction<SakoCreator[]>>;
+  handleStartDM: (creator: SakoCreator) => void;
+  setChatInputText: (text: string) => void;
+  activeReelCommentsId: string | null;
+  setActiveReelCommentsId: (id: string | null) => void;
+  newReelComment: string;
+  setNewReelComment: (text: string) => void;
+  myProfile: any;
+  showToast: (msg: string) => void;
+}
+
+function InstagramReelCard({
+  reel,
+  lang,
+  followingIds,
+  setFollowingIds,
+  setReels,
+  creators,
+  setCreators,
+  handleStartDM,
+  setChatInputText,
+  activeReelCommentsId,
+  setActiveReelCommentsId,
+  newReelComment,
+  setNewReelComment,
+  myProfile,
+  showToast
+}: InstagramReelCardProps) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [isBuffering, setIsBuffering] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [showPlayStateIndicator, setShowPlayStateIndicator] = useState<"play" | "pause" | null>(null);
+
+  useEffect(() => {
+    if (videoRef.current) {
+      if (isPlaying) {
+        videoRef.current.play().catch(() => {
+          // Fallback if autoplay is blocked
+          setIsPlaying(false);
+        });
+      } else {
+        videoRef.current.pause();
+      }
+    }
+  }, [isPlaying]);
+
+  const togglePlay = () => {
+    setIsPlaying(!isPlaying);
+    setShowPlayStateIndicator(!isPlaying ? "play" : "pause");
+    setTimeout(() => {
+      setShowPlayStateIndicator(null);
+    }, 600);
+  };
+
+  const handleShareReel = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: reel.title,
+          text: reel.desc,
+          url: window.location.href
+        });
+        showToast(lang === "en" ? "Shared successfully!" : "بە سەرکەوتوویی هاوبەش کرا!");
+      } catch (e) {
+        console.log("Share skipped or failed", e);
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(window.location.href);
+        showToast(lang === "en" ? "Reel link copied to clipboard!" : "بەستەری ڤیدیۆکە کۆپی کرا!");
+      } catch (err) {
+        showToast(lang === "en" ? "Failed to copy link" : "کۆپیکردن سەرکەوتوو نەبوو");
+      }
+    }
+  };
+
+  const hasCommentsActive = activeReelCommentsId === reel.id;
+
+  const placeholderUrl = reel.id === "reel_1" 
+    ? "https://images.unsplash.com/photo-1482862549707-f63cb32c5fd9?w=400&q=40"
+    : reel.id === "reel_2"
+    ? "https://images.unsplash.com/photo-1543536448-d209d2d13a1c?w=400&q=40"
+    : "https://images.unsplash.com/photo-1448375240586-882707db888b?w=400&q=40";
+
+  return (
+    <div className="w-full h-full snap-start relative bg-black flex flex-col justify-end overflow-hidden">
+      {/* Video Stream Element */}
+      <div className="absolute inset-0 w-full h-full z-10 cursor-pointer select-none" onClick={togglePlay}>
+        <video
+          ref={videoRef}
+          src={reel.videoUrl}
+          loop
+          muted
+          autoPlay
+          playsInline
+          onWaiting={() => setIsBuffering(true)}
+          onPlaying={() => {
+            setIsBuffering(false);
+            setIsLoaded(true);
+          }}
+          onCanPlay={() => setIsLoaded(true)}
+          onLoadedData={() => setIsLoaded(true)}
+          className="w-full h-full object-cover"
+        />
+      </div>
+
+      {/* Play/Pause state HUD overlay feedback */}
+      {showPlayStateIndicator && (
+        <div className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none animate-ping">
+          <div className="bg-black/80 p-5 rounded-full border border-cyan-400/30 text-cyan-400">
+            {showPlayStateIndicator === "play" ? (
+              <svg className="w-8 h-8 fill-current" viewBox="0 0 24 24">
+                <path d="M8 5v14l11-7z" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            ) : (
+              <svg className="w-8 h-8 fill-current" viewBox="0 0 24 24">
+                <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Seamless Blurred Loader Shimmer Proxy */}
+      <div 
+        className={`absolute inset-0 transition-opacity duration-700 ease-in-out z-20 ${
+          isLoaded && !isBuffering ? "opacity-0 pointer-events-none" : "opacity-100"
+        }`}
+      >
+        <img 
+          src={placeholderUrl} 
+          className="w-full h-full object-cover filter blur-xl scale-110 brightness-[0.4]"
+          alt=""
+        />
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50">
+          <div className="relative flex items-center justify-center">
+            <div className="w-16 h-16 rounded-full border-4 border-cyan-500/20 border-t-cyan-400 border-r-cyan-400/60 animate-spin" />
+            <div className="absolute w-10 h-10 rounded-full border-4 border-cyan-800/10 border-b-cyan-500/80 border-l-cyan-500/40 animate-spin" style={{ animationDirection: 'reverse' }} />
+            <Clapperboard className="absolute w-5 h-5 text-cyan-400 animate-pulse" />
+          </div>
+          <span className="text-[10px] font-mono text-cyan-400 tracking-widest font-bold mt-4 uppercase animate-pulse">
+            {lang === "en" ? "Streaming Proxy..." : "بۆردکاردی ڤیدیۆ..."}
+          </span>
+          <span className="text-[8px] font-mono text-gray-500 uppercase mt-1 tracking-wider">
+            REC.709 GRADING ENGINE
+          </span>
+        </div>
+      </div>
+
+      {/* BOTTOM GRADIENT OVERLAY (increases readability of profile information) */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-black/25 z-20 pointer-events-none" />
+
+      {/* OVERLAY SECTION - BOTTOM LEFT Profile info */}
+      <div className="absolute bottom-6 left-4 right-16 z-30 flex flex-col items-start gap-2 text-left p-2.5 rounded-xl max-w-[75%] pointer-events-auto">
+        <div className="flex items-center gap-2">
+          <img 
+            src={reel.creatorAvatar} 
+            className="w-9 h-9 rounded-full object-cover border-2 border-cyan-400 bg-black/80 shadow-md" 
+            alt="" 
+          />
+          <div>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <h4 className="text-xs font-bold text-white shadow-sm leading-none">{reel.creatorName}</h4>
+              
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const isFollowing = followingIds.includes(reel.creatorId);
+                  if (isFollowing) {
+                    setFollowingIds(prev => prev.filter(id => id !== reel.creatorId));
+                    showToast(lang === "en" ? `Unfollowed @${reel.creatorId}` : `فۆڵۆوت لادا بۆ @${reel.creatorId}`);
+                  } else {
+                    setFollowingIds(prev => [...prev, reel.creatorId]);
+                    showToast(lang === "en" ? `Following @${reel.creatorId}!` : `فۆڵۆوت کرد @${reel.creatorId}!`);
+                  }
+                }}
+                className={`px-2 py-0.5 rounded text-[8.5px] font-mono font-extrabold uppercase tracking-wider transition-all border ${
+                  followingIds.includes(reel.creatorId)
+                    ? "bg-gray-900/90 border-gray-800 text-gray-500"
+                    : "bg-cyan-500 border-cyan-400 text-black hover:bg-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.4)]"
+                }`}
+              >
+                {followingIds.includes(reel.creatorId) 
+                  ? (lang === "en" ? "Following" : "فۆڵۆو کراوە") 
+                  : (lang === "en" ? "Follow" : "فۆڵۆو")}
+              </button>
+            </div>
+            <span className="text-[9.5px] font-mono text-cyan-400 leading-none">@{reel.creatorId}</span>
+          </div>
+        </div>
+        
+        <div>
+          <h5 className="text-[11px] font-bold text-white tracking-wide leading-tight mb-1">{reel.title}</h5>
+          <p className="text-[10px] text-gray-300 leading-normal line-clamp-2 max-w-xs">{reel.desc}</p>
+        </div>
+      </div>
+
+      {/* OVERLAY SECTION - SIDE ACTION BAR (BOTTOM RIGHT) */}
+      <div className="absolute right-3 bottom-6 flex flex-col gap-3.5 z-30 items-center">
+        {/* Like Button */}
+        <button 
+          onClick={(e) => {
+            e.stopPropagation();
+            setReels(prev => prev.map(r => {
+              if (r.id === reel.id) {
+                return {
+                  ...r,
+                  likes: r.liked ? r.likes - 1 : r.likes + 1,
+                  liked: !r.liked
+                };
+              }
+              return r;
+            }));
+          }}
+          className="flex flex-col items-center justify-center bg-black/60 hover:bg-black/95 p-2 rounded-full border border-gray-800 text-white cursor-pointer transition-all hover:scale-110 active:scale-90 shadow-2xl w-10 h-10"
+        >
+          <Heart className={`w-4.5 h-4.5 transition-colors ${reel.liked ? "text-red-500 fill-red-500" : "text-gray-300"}`} />
+          <span className="text-[8px] font-mono font-bold mt-0.5 text-gray-300">{reel.likes}</span>
+        </button>
+
+        {/* Comment Button */}
+        <button 
+          onClick={(e) => {
+            e.stopPropagation();
+            setActiveReelCommentsId(hasCommentsActive ? null : reel.id);
+          }}
+          className="flex flex-col items-center justify-center bg-black/60 hover:bg-black/95 p-2 rounded-full border border-gray-800 text-white cursor-pointer transition-all hover:scale-110 active:scale-90 shadow-2xl w-10 h-10"
+        >
+          <MessageSquare className="w-4.5 h-4.5 text-cyan-400" />
+          <span className="text-[8px] font-mono font-bold mt-0.5 text-gray-300">{reel.comments.length}</span>
+        </button>
+
+        {/* Share Button (Native/Clipboard) */}
+        <button 
+          onClick={(e) => {
+            e.stopPropagation();
+            handleShareReel();
+          }}
+          className="flex flex-col items-center justify-center bg-black/60 hover:bg-black/95 p-2 rounded-full border border-gray-800 text-white cursor-pointer transition-all hover:scale-110 active:scale-95 shadow-2xl w-10 h-10"
+          title="Share Reel"
+        >
+          <Share2 className="w-4.5 h-4.5 text-green-400" />
+          <span className="text-[8px] font-mono font-bold mt-0.5 text-gray-300 uppercase tracking-tighter">{lang === "en" ? "Share" : "بنێرە"}</span>
+        </button>
+
+        {/* Meet/DM Shortcut */}
+        <button 
+          onClick={(e) => {
+            e.stopPropagation();
+            let matchedCr = creators.find(c => c.name.toLowerCase() === reel.creatorName.toLowerCase());
+            if (!matchedCr) {
+              matchedCr = {
+                id: reel.creatorId,
+                name: reel.creatorName,
+                role: "Cinematographer",
+                avatarUrl: reel.creatorAvatar,
+                bio: "Cinematic reel creator",
+                location: "Sulaymaniyah, Kurdistan",
+                rating: "5.0",
+                views: 180,
+                joinedDate: "May 2026",
+                portfolio: []
+              };
+              setCreators(prev => [...prev, matchedCr!]);
+            }
+            handleStartDM(matchedCr);
+            
+            setTimeout(() => {
+              setChatInputText(lang === "en" 
+                ? `Loved your cinematic reel: "${reel.title}"! Let's collaborate model setups.` 
+                : `بێگومان ڤیدیۆکەتم زۆر بەلاوە سەرنجڕاکێش بوو: "${reel.title}"! با پێکەوە کار بکەین.`);
+            }, 200);
+          }}
+          className="flex flex-col items-center justify-center bg-cyan-950/80 hover:bg-cyan-900 p-2 rounded-full border border-cyan-800/40 text-cyan-400 cursor-pointer transition-all hover:scale-110 active:scale-90 shadow-2xl w-10 h-10"
+          title="Connect DM"
+        >
+          <Send className="w-4 h-4 text-cyan-400" />
+          <span className="text-[8px] font-mono font-bold mt-0.5 text-cyan-400 uppercase tracking-tighter">{lang === "en" ? "DM" : "نامە"}</span>
+        </button>
+      </div>
+
+      {/* Slide-Up Comments Overlay Drawer */}
+      {hasCommentsActive && (
+        <div className="absolute inset-x-0 bottom-0 max-h-[55%] bg-[#040404]/95 backdrop-blur-md rounded-t-3xl border-t border-cyan-500/20 z-40 p-4 flex flex-col text-left space-y-3 animate-slideUp">
+          <div className="flex items-center justify-between border-b border-gray-900 pb-2">
+            <h5 className="text-[10px] font-mono font-bold uppercase tracking-widest text-cyan-400 flex items-center gap-1.5 leading-none">
+              <MessageSquare className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
+              <span>{lang === "en" ? "Comments Feed" : "کۆمێنتەکان"} ({reel.comments.length})</span>
+            </h5>
+            <button 
+              onClick={() => setActiveReelCommentsId(null)} 
+              className="p-1 cursor-pointer text-gray-500 hover:text-white transition-colors"
+            >
+              <X className="w-4.5 h-4.5" />
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto no-scrollbar space-y-2 py-1 max-h-[140px]">
+            {reel.comments.map((comment, idx) => (
+              <div key={idx} className="bg-black/60 p-2.5 rounded-xl border border-gray-950 text-[10px] space-y-0.5">
+                <p className="font-bold text-cyan-400 text-[9.5px]">@{comment.author}</p>
+                <p className="text-gray-300 leading-normal">{comment.text}</p>
+              </div>
+            ))}
+            {reel.comments.length === 0 && (
+              <p className="text-[9px] text-gray-600 font-mono text-center py-4">{lang === "en" ? "No comments yet. Start the buzz!" : "کۆمێنت بڵاونەکراوەتەوە."}</p>
+            )}
+          </div>
+
+          <div className="flex gap-1.5 pt-1 border-t border-gray-950">
+            <input 
+              type="text" 
+              placeholder={lang === "en" ? "Add respectful critique..." : "کۆمێنتێک بنووسە..."}
+              className="flex-1 bg-black rounded-xl border border-gray-900 px-3 py-2 text-[10.5px] text-white focus:outline-none focus:border-cyan-400/50"
+              value={newReelComment}
+              onChange={(e) => setNewReelComment(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && newReelComment.trim()) {
+                  setReels(prev => prev.map(r => {
+                    if (r.id === reel.id) {
+                      return {
+                        ...r,
+                        comments: [...r.comments, { author: myProfile.name, text: newReelComment.trim() }]
+                      };
+                    }
+                    return r;
+                  }));
+                  setNewReelComment("");
+                  showToast(lang === "en" ? "Comment added!" : "کۆمێنتەکەت بڵاوکرایەوە!");
+                }
+              }}
+            />
+            <button 
+              onClick={() => {
+                if (!newReelComment.trim()) return;
+                setReels(prev => prev.map(r => {
+                  if (r.id === reel.id) {
+                    return {
+                      ...r,
+                      comments: [...r.comments, { author: myProfile.name, text: newReelComment.trim() }]
+                    };
+                  }
+                  return r;
+                }));
+                setNewReelComment("");
+                showToast(lang === "en" ? "Comment added!" : "کۆمێنتەکەت بڵاوکرایەوە!");
+              }}
+              className="bg-cyan-950 border border-cyan-800 text-cyan-400 px-3 py-2 rounded-xl text-[10px] font-mono font-bold hover:bg-cyan-900 cursor-pointer transition-colors"
+            >
+              {lang === "en" ? "POST" : "بنێ"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   // First Launch state
   const [lang, setLang] = useState<Lang | null>(() => {
@@ -219,13 +666,82 @@ export default function App() {
     return localStorage.getItem("krdhub_registered") === "true";
   });
 
-  const [regPhoto, setRegPhoto] = useState<string>("https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&fit=crop&q=80");
-  const [regName, setRegName] = useState("");
-  const [regAge, setRegAge] = useState("");
-  const [regGender, setRegGender] = useState("male");
-  const [regLocation, setRegLocation] = useState("");
-  const [regWork, setRegWork] = useState("");
-  const [regBio, setRegBio] = useState("");
+  const [regPhoto, setRegPhoto] = useState<string>(() => {
+    const stored = localStorage.getItem("krdhub_my_profile");
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (parsed?.avatarUrl) return parsed.avatarUrl;
+      } catch (e) {}
+    }
+    return "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&fit=crop&q=80";
+  });
+
+  const [regName, setRegName] = useState(() => {
+    const stored = localStorage.getItem("krdhub_my_profile");
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (parsed?.name) return parsed.name;
+      } catch (e) {}
+    }
+    return "";
+  });
+
+  const [regAge, setRegAge] = useState(() => {
+    const stored = localStorage.getItem("krdhub_my_profile");
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (parsed?.age) return String(parsed.age);
+      } catch (e) {}
+    }
+    return "";
+  });
+
+  const [regGender, setRegGender] = useState(() => {
+    const stored = localStorage.getItem("krdhub_my_profile");
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (parsed?.gender) return parsed.gender;
+      } catch (e) {}
+    }
+    return "male";
+  });
+
+  const [regLocation, setRegLocation] = useState(() => {
+    const stored = localStorage.getItem("krdhub_my_profile");
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (parsed?.location) return parsed.location;
+      } catch (e) {}
+    }
+    return "";
+  });
+
+  const [regWork, setRegWork] = useState(() => {
+    const stored = localStorage.getItem("krdhub_my_profile");
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (parsed?.role) return parsed.role;
+      } catch (e) {}
+    }
+    return "";
+  });
+
+  const [regBio, setRegBio] = useState(() => {
+    const stored = localStorage.getItem("krdhub_my_profile");
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (parsed?.bio) return parsed.bio;
+      } catch (e) {}
+    }
+    return "";
+  });
   const [dragActive, setDragActive] = useState(false);
 
   // File Upload Handlers (for profile photo registration)
@@ -313,17 +829,143 @@ export default function App() {
   };
 
   const [useDeviceFrame, setUseDeviceFrame] = useState(true);
-  const [activeTab, setActiveTab] = useState<"biner" | "sako" | "chat" | "my-profile">("biner");
+  const [activeTab, setActiveTab] = useState<"biner" | "sako" | "videos" | "chat" | "my-profile">("biner");
+
+  // App Relative Time Indicator Utility
+  const getRelativeTime = (timestamp: number | string | undefined, lang: "en" | "ckb"): string => {
+    if (!timestamp) {
+      return lang === "en" ? "2 days ago" : "٢ ڕۆژ پێش ئێستا";
+    }
+    const now = Date.now();
+    const past = typeof timestamp === "number" ? timestamp : new Date(timestamp).getTime();
+    const diffMs = now - past;
+    if (isNaN(past) || diffMs < 0) {
+      return lang === "en" ? "Just now" : "ئێستا";
+    }
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+    const diffHour = Math.floor(diffMin / 60);
+    const diffDay = Math.floor(diffHour / 24);
+
+    if (diffSec < 60) {
+      return lang === "en" ? "Just now" : "ئێستا";
+    } else if (diffMin < 60) {
+      return lang === "en" ? `${diffMin}m ago` : `${diffMin} خولەک پێش ئێستا`;
+    } else if (diffHour < 24) {
+      return lang === "en" ? `${diffHour}h ago` : `${diffHour} کاتژمێر پێش ئێستا`;
+    } else if (diffDay === 1) {
+      return lang === "en" ? "Yesterday" : "دوێنێ";
+    } else {
+      return lang === "en" ? `${diffDay}d ago` : `${diffDay} ڕۆژ پێش ئێستا`;
+    }
+  };
+
+  // Lightbox visual zoom variables
+  const [zoomedImage, setZoomedImage] = useState<string | null>(null);
+  const [zoomScale, setZoomScale] = useState(1);
+
+  const [followingIds, setFollowingIds] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("krdhub_following") || "[]");
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem("krdhub_following", JSON.stringify(followingIds));
+  }, [followingIds]);
+
+  // Group chat configuration variables
+  const [showGroupModal, setShowGroupModal] = useState(false);
+  const [groupName, setGroupName] = useState("");
+  const [selectedGroupMembers, setSelectedGroupMembers] = useState<string[]>([]);
+
+  // Scenic cinematic video reels matching
+  const [reels, setReels] = useState([
+    {
+      id: "reel_1",
+      title: "Alpine Freeride Journey",
+      desc: "Testing high-altitude camera stabilizers in heavy powder snow slopes. Fully graded.",
+      videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-cinematic-view-of-a-snowy-mountain-range-43285-large.mp4",
+      creatorId: "c-marcus",
+      creatorName: "Marcus Thorne",
+      creatorAvatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&fit=crop&q=80",
+      likes: 142,
+      liked: false,
+      comments: [
+        { author: "Zara Kamal", text: "Stunning grading!" },
+        { author: "Dara Ahmad", text: "The shutter speed looks so crisp." }
+      ]
+    },
+    {
+      id: "reel_2",
+      title: "Neon Dreams Sequence",
+      desc: "Late night study overlay mockup using glowing cybernetic title sequences.",
+      videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-man-dancing-under-neon-lights-40082-large.mp4",
+      creatorId: "c-saman",
+      creatorName: "Saman Farhad",
+      creatorAvatar: "https://images.unsplash.com/photo-1500048993953-d23a436266cf?w=400&fit=crop&q=80",
+      likes: 219,
+      liked: false,
+      comments: [
+        { author: "Marcus Thorne", text: "Mind-blowing kinetic typography!" }
+      ]
+    },
+    {
+      id: "reel_3",
+      title: "Golden Forest Stream",
+      desc: "An atmospheric study tracking cinematic light rays piercing through dense morning mist.",
+      videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-forest-stream-in-the-sunlight-529-large.mp4",
+      creatorId: "c-dara",
+      creatorName: "Dara Ahmad",
+      creatorAvatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&fit=crop&q=80",
+      likes: 98,
+      liked: false,
+      comments: [
+        { author: "Zara Kamal", text: "Organic and relaxing frame composition." }
+      ]
+    }
+  ]);
+
+  // Active comments drawer state for video reels
+  const [activeReelCommentsId, setActiveReelCommentsId] = useState<string | null>(null);
+  const [newReelComment, setNewReelComment] = useState("");
+
+  // Hidden references for chat attachments
+  const chatMediaInputRef = useRef<HTMLInputElement>(null);
 
   // Synchronized and fully live data states
   const [creators, setCreators] = useState<SakoCreator[]>(initialCreators);
-  const [trendingMovies] = useState<Movie[]>(initialTrendingMovies);
+  const [trendingMovies, setTrendingMovies] = useState<Movie[]>(() => {
+    const stored = localStorage.getItem("krdhub_works_posts");
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      } catch (e) {
+        console.error("Failed to parse stored works", e);
+      }
+    }
+    return initialTrendingMovies;
+  });
+
+  // Save trendingMovies to localStorage
+  useEffect(() => {
+    if (trendingMovies && trendingMovies.length > 0) {
+      localStorage.setItem("krdhub_works_posts", JSON.stringify(trendingMovies));
+    }
+  }, [trendingMovies]);
+
   const [conversations, setConversations] = useState<ChatConversation[]>(initialConversations);
 
   // Active interaction states
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
   const [chatInputText, setChatInputText] = useState("");
   const [globalSearchQuery, setGlobalSearchQuery] = useState("");
+  const [selectedRoleFilter, setSelectedRoleFilter] = useState("All");
   const [moodSearchQuery, setMoodSearchQuery] = useState("");
   const [isMoodSearching, setIsMoodSearching] = useState(false);
   const [moodSearchResults, setMoodSearchResults] = useState<Movie[]>([]);
@@ -334,26 +976,39 @@ export default function App() {
   const [activeLightboxImage, setActiveLightboxImage] = useState<string | null>(null);
 
   // Self Profile status
-  const [myProfile, setMyProfile] = useState<SakoCreator>({
-    id: "me",
-    name: "Alex Reed",
-    role: "Video Editor & Colorist",
-    avatarUrl: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&fit=crop&q=80",
-    bio: "Passionate storyteller with an eye for dramatic lighting and seamless pacing. Let's create something legendary.",
-    location: "Brooklyn, NY",
-    rating: "5.0",
-    views: 120,
-    joinedDate: "May 2026",
-    portfolio: [
-      {
-        id: "p_me_1",
-        title: "Lost High-Fi Neon Horizon Teaser",
-        type: "image",
-        url: "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=800&auto=format&fit=crop&q=80",
-        description: "Behind-the-scenes grading profile for independent production.",
-        aspect: "landscape"
+  const [myProfile, setMyProfile] = useState<SakoCreator>(() => {
+    const stored = localStorage.getItem("krdhub_my_profile");
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (parsed && typeof parsed === "object") {
+          return parsed;
+        }
+      } catch (e) {
+        console.error("Failed to parse stored myProfile", e);
       }
-    ]
+    }
+    return {
+      id: "me",
+      name: "Alex Reed",
+      role: "Video Editor & Colorist",
+      avatarUrl: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&fit=crop&q=80",
+      bio: "Passionate storyteller with an eye for dramatic lighting and seamless pacing. Let's create something legendary.",
+      location: "Brooklyn, NY",
+      rating: "5.0",
+      views: 120,
+      joinedDate: "May 2026",
+      portfolio: [
+        {
+          id: "p_me_1",
+          title: "Lost High-Fi Neon Horizon Teaser",
+          type: "image",
+          url: "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=800&auto=format&fit=crop&q=80",
+          description: "Behind-the-scenes grading profile for independent production.",
+          aspect: "landscape"
+        }
+      ]
+    };
   });
 
   // Editor detail models
@@ -364,6 +1019,24 @@ export default function App() {
   const [editBio, setEditBio] = useState(myProfile.bio);
   const [editAvatarUrl, setEditAvatarUrl] = useState(myProfile.avatarUrl);
 
+  // Sync edit fields when myProfile updates or is loaded from localStorage
+  useEffect(() => {
+    if (myProfile) {
+      setEditName(myProfile.name);
+      setEditRole(myProfile.role);
+      setEditLocation(myProfile.location);
+      setEditBio(myProfile.bio);
+      setEditAvatarUrl(myProfile.avatarUrl);
+    }
+  }, [myProfile]);
+
+  // Persist myProfile to localStorage whenever it changes
+  useEffect(() => {
+    if (myProfile) {
+      localStorage.setItem("krdhub_my_profile", JSON.stringify(myProfile));
+    }
+  }, [myProfile]);
+
   // Portfolio publication models
   const [newPortTitle, setNewPortTitle] = useState("");
   const [newPortUrl, setNewPortUrl] = useState("");
@@ -372,9 +1045,101 @@ export default function App() {
   const [newPortAspect, setNewPortAspect] = useState<"landscape" | "portrait" | "square">("landscape");
   const [showAddPortfolio, setShowAddPortfolio] = useState(false);
 
+  // New Post publication models
+  const [showAddPostModal, setShowAddPostModal] = useState(false);
+  const [newPostTitle, setNewPostTitle] = useState("");
+  const [newPostDesc, setNewPostDesc] = useState("");
+  const [newPostCategory, setNewPostCategory] = useState("Videographer");
+  const [newPostPhoto, setNewPostPhoto] = useState("");
+  const [newPostYear, setNewPostYear] = useState("2026");
+  const postImgInputRef = useRef<HTMLInputElement>(null);
+
   // Notification states
   const [notification, setNotification] = useState<string | null>(null);
   const chatBottomRef = useRef<HTMLDivElement>(null);
+  const profileImgInputRef = useRef<HTMLInputElement>(null);
+
+  const handleProfilePhotoChange = (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      showToast(lang === "en" ? "Please upload an image file." : "تکایە تەنها وێنە باربکە.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      if (e.target?.result) {
+        const photoUrl = e.target.result as string;
+        
+        // Update both the registration state image and actual live myProfile
+        setRegPhoto(photoUrl);
+        
+        const updated = {
+          ...myProfile,
+          avatarUrl: photoUrl
+        };
+        setMyProfile(updated);
+        
+        // Synchronize updated profile to the server database
+        fetch("/api/creator/profile", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updated)
+        })
+          .then(() => {
+            showToast(lang === "en" ? "Profile photo updated successfully!" : "وێنەی پرۆفایل بە سەرکەوتوویی نوێکرایەوە!");
+          })
+          .catch((err) => console.error("Profile photo server sync failed:", err));
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSaveNewPost = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPostPhoto) {
+      showToast(lang === "en" ? "Please select an image or media file to publish!" : "تکایە سەرەتا وێنەیەک دیاریبکە بۆ بڵاوکردنەوە!");
+      return;
+    }
+    
+    const captionText = newPostTitle.trim() || (lang === "en" ? "Visual Asset Share" : "بڵاوکردنەوەی کار");
+    
+    const newPost: Movie = {
+      id: "m_user_" + Date.now(),
+      title: captionText,
+      year: "2026",
+      genre: myProfile.role || "Creator",
+      description: newPostDesc.trim() || (lang === "en" ? "Creative artwork shared by verified artist." : "کاری هونەری هاوبەشکراو لەلایەن سینەماکار."),
+      director: myProfile.name,
+      rating: "9.8",
+      backdropUrl: newPostPhoto,
+      indie: true,
+      createdAt: Date.now() // Absolute current timestamp for relative date calculation
+    };
+
+    setTrendingMovies((prev) => [newPost, ...prev]);
+    setShowAddPostModal(false);
+    
+    // Reset form fields
+    setNewPostTitle("");
+    setNewPostDesc("");
+    setNewPostPhoto("");
+
+    showToast(lang === "en" ? "Post published to feed!" : "پۆستەکە بە سەرکەوتوویی بڵاوکرایەوە!");
+  };
+
+  const handlePostPhotoUpload = (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      showToast(lang === "en" ? "Please upload an image file." : "تکایە تەنها وێنە باربکە.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      if (e.target?.result) {
+        setNewPostPhoto(e.target.result as string);
+        showToast(lang === "en" ? "Image loaded successfully" : "وێنەکە بە سەرکەوتوویی بارکرا");
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Auto Scroll Chat
   useEffect(() => {
@@ -389,16 +1154,48 @@ export default function App() {
     fetch("/api/initial-state")
       .then((res) => res.json())
       .then((data) => {
-        if (data.creators) {
-          setCreators(data.creators);
-          const selfCreator = data.creators.find((c: SakoCreator) => c.id === "me" || c.id === " Alex Reed");
+        if (data.conversations) {
+          setConversations(data.conversations);
+        }
+
+        let loadedCreators: SakoCreator[] = data.creators || [];
+
+        // Check localStorage to retrieve previous profile details (Name, Age, Bio, etc.)
+        const storedProfileStr = localStorage.getItem("krdhub_my_profile");
+        const isUserRegistered = localStorage.getItem("krdhub_registered") === "true";
+
+        if (isUserRegistered && storedProfileStr) {
+          try {
+            const localProfile = JSON.parse(storedProfileStr);
+            if (localProfile) {
+              setMyProfile(localProfile);
+
+              // Instantly sync the locally saved profile to the server database memory/SSE
+              fetch("/api/creator/profile", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(localProfile)
+              }).catch((e) => console.error("Initial load server sync failed:", e));
+
+              // Ensure the registered user's profile is in the local creators feed list
+              const exists = loadedCreators.some((c) => c.id === localProfile.id);
+              if (!exists) {
+                loadedCreators = [localProfile, ...loadedCreators];
+              } else {
+                loadedCreators = loadedCreators.map((c) => c.id === localProfile.id ? localProfile : c);
+              }
+            }
+          } catch (e) {
+            console.error("Failed to parse stored profile on fetch initial state", e);
+          }
+        } else {
+          const selfCreator = loadedCreators.find((c: SakoCreator) => c.id === "me" || c.id === "Alex Reed");
           if (selfCreator) {
             setMyProfile(selfCreator);
           }
         }
-        if (data.conversations) {
-          setConversations(data.conversations);
-        }
+
+        setCreators(loadedCreators);
       })
       .catch((e) => console.log("Failed to load initial sync state:", e));
 
@@ -563,6 +1360,40 @@ export default function App() {
     showToast(`${currentT.sysToastMsg} ${creator.name}`);
   };
 
+  // Direct Messaging trigger from post feed card
+  const handleStartDMFromFeed = (movie: Movie) => {
+    let targetCreator = creators.find(
+      (c) => c.name.toLowerCase() === movie.director.toLowerCase()
+    );
+
+    if (!targetCreator) {
+      const randomAvatar = `https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&fit=crop&q=80`;
+      targetCreator = {
+        id: `c-dyn-${Date.now()}`,
+        name: movie.director,
+        role: movie.genre || "Film Director",
+        avatarUrl: randomAvatar,
+        bio: `Cinematographic project director of "${movie.title}". Join the workspace to negotiate terms!`,
+        location: "Erbil, Kurdistan",
+        rating: "5.0",
+        views: 220,
+        joinedDate: "May 2026",
+        portfolio: [
+          {
+            id: `p-dyn-${Date.now()}`,
+            title: movie.title,
+            type: "image",
+            url: movie.backdropUrl || "https://images.unsplash.com/photo-1542838132-92c53300491e?w=800&fit=crop&q=80",
+            description: movie.description
+          }
+        ]
+      };
+      setCreators((prev) => [...prev, targetCreator!]);
+    }
+
+    handleStartDM(targetCreator);
+  };
+
   const handleSendMessage = () => {
     if (!chatInputText.trim() || !activeConvId) return;
 
@@ -606,6 +1437,94 @@ export default function App() {
     }).catch(err => console.error("Transmit chat failed:", err));
   };
 
+  // Send photo or video directly inside active thread
+  const handleSendMediaMessage = (file: File) => {
+    if (!activeConvId) return;
+    const isVideo = file.type.startsWith("video/");
+    const isImage = file.type.startsWith("image/");
+    if (!isVideo && !isImage) {
+      showToast(lang === "en" ? "Only images or video files supported as chat media attachments." : "تەنها وێنە و فیدیۆ گونجاوە بۆ نامەکەت.");
+      return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const mediaResult = e.target?.result as string;
+      if (!mediaResult) return;
+      
+      const targetConv = conversations.find((c) => c.id === activeConvId);
+      if (!targetConv) return;
+
+      const msgId = `msg-me-media-${Date.now()}`;
+      const timestamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+      const newMsg: ChatMessage = {
+        id: msgId,
+        senderId: "me",
+        text: isVideo ? "Sent video brief attachment" : "Sent high-fidelity photo share",
+        timestamp,
+        mediaUrl: mediaResult,
+        mediaType: isVideo ? "video" : "image"
+      };
+
+      setConversations((prev) =>
+        prev.map((c) => {
+          if (c.id === activeConvId) {
+            return {
+              ...c,
+              messages: [...c.messages, newMsg]
+            };
+          }
+          return c;
+        })
+      );
+
+      showToast(lang === "en" ? "Media attachment shared!" : "میدیاکە بە سەرکەوتوویی نێردرا!");
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Share Live Location with a strict 10-minute timer limits
+  const handleSendLiveLocation = () => {
+    if (!activeConvId) return;
+
+    // Standard high-accuracy simulated Erbil coordinates with decimal shifts
+    const randomFuzzLat = (Math.random() - 0.5) * 0.02;
+    const randomFuzzLng = (Math.random() - 0.5) * 0.02;
+    const lat = 36.1912 + randomFuzzLat;
+    const lng = 44.0091 + randomFuzzLng;
+    const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes strictly in milliseconds
+
+    const timestamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const msgId = `msg-me-loc-${Date.now()}`;
+
+    const newMsg: ChatMessage = {
+      id: msgId,
+      senderId: "me",
+      text: "[Live Location Shared]",
+      timestamp,
+      liveLocation: {
+        lat,
+        lng,
+        expiresAt
+      }
+    };
+
+    setConversations((prev) =>
+      prev.map((c) => {
+        if (c.id === activeConvId) {
+          return {
+            ...c,
+            messages: [...c.messages, newMsg]
+          };
+        }
+        return c;
+      })
+    );
+
+    showToast(lang === "en" ? "Live Location Shared (active 10 mins)!" : "شوێنی ڕاستەوخۆ دەستنیشانکرا بۆ ١٠ خولەک!");
+  };
+
   const handleSaveProfile = () => {
     const updated = {
       ...myProfile,
@@ -626,6 +1545,50 @@ export default function App() {
     })
       .then(() => showToast(currentT.sysToastSaved))
       .catch((e) => console.error("Creator sync failed:", e));
+  };
+
+  // Launch live creative team group workspace
+  const handleCreateGroupChat = () => {
+    if (!groupName.trim()) {
+      showToast(lang === "en" ? "Please enter a group name!" : "تکایە ناوی گرووپەکە بنووسە!");
+      return;
+    }
+    if (selectedGroupMembers.length === 0) {
+      showToast(lang === "en" ? "Select at least 1 member to initiate group!" : "تکایە لانی کەم یەک ئەندام دیاری بکە!");
+      return;
+    }
+    if (selectedGroupMembers.length > 11) { // total members = self + 11 = 12 members max
+      showToast(lang === "en" ? "Max limit of 12 group members reached!" : "تکایە لە ١٢ ئەندام زیاتر نابێت بە خۆتەوە!");
+      return;
+    }
+
+    const newGroupId = `group-${Date.now()}`;
+    const initialMessage: ChatMessage = {
+      id: `m-gr-init-${Date.now()}`,
+      senderId: "system",
+      text: lang === "en" 
+        ? `Group chat "${groupName}" created by verified workspace agent.` 
+        : `گروپی "${groupName}" دروستکرا لە لایەن خاوەن کارەوە.`,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+
+    const newGroupConv: ChatConversation = {
+      id: newGroupId,
+      creatorId: newGroupId, 
+      creatorName: groupName.trim(),
+      creatorAvatar: "https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?w=150&fit=crop&q=80", 
+      creatorRole: `${selectedGroupMembers.length + 1} MEMBERS`,
+      messages: [initialMessage],
+      unread: false,
+      isGroup: true,
+      groupMembers: ["me", ...selectedGroupMembers]
+    };
+
+    setConversations([newGroupConv, ...conversations]);
+    setActiveConvId(newGroupId);
+    setShowGroupModal(false);
+
+    showToast(lang === "en" ? `Group chat "${groupName}" initialized!` : `گروپی نوێی "${groupName}" دەستپێکرا!`);
   };
 
   const handleAddPortfolioItem = () => {
@@ -1069,22 +2032,24 @@ export default function App() {
           )}
 
           {/* Core app top bar */}
-          <div className="bg-[#030303]/95 backdrop-blur-md px-4 py-3 border-b border-gray-900 flex items-center justify-between shrink-0">
-            <div className="flex items-center gap-2">
-              <Film className="w-5 h-5 text-cyan-400" />
-              <span id="app-logo" className="text-md font-bold font-display uppercase tracking-widest text-white">
-                {currentT.appLogo}
-              </span>
+          {!(activeTab === "chat" && activeConvId !== null) && (
+            <div className="bg-[#030303]/95 backdrop-blur-md px-4 py-3 border-b border-gray-900 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2">
+                <Film className="w-5 h-5 text-cyan-400" />
+                <span id="app-logo" className="text-md font-bold font-display uppercase tracking-widest text-white">
+                  {currentT.appLogo}
+                </span>
+              </div>
+              
+              <div className="flex items-center gap-1 bg-cyan-950/40 border border-cyan-500/20 px-2 py-0.5 rounded text-[10px] font-mono text-cyan-400">
+                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
+                {currentT.aiIndicator}
+              </div>
             </div>
-            
-            <div className="flex items-center gap-1 bg-cyan-950/40 border border-cyan-500/20 px-2 py-0.5 rounded text-[10px] font-mono text-cyan-400">
-              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
-              {currentT.aiIndicator}
-            </div>
-          </div>
+          )}
 
           {/* Main viewport */}
-          <div className="flex-1 overflow-y-auto no-scrollbar relative bg-[#030303] flex flex-col pb-24">
+          <div className={`flex-1 overflow-y-auto no-scrollbar relative bg-[#030303] flex flex-col ${(activeTab === "chat" && activeConvId !== null) ? "pb-0" : "pb-24"}`}>
             {/* LIGHTBOX PREVIEW */}
             {activeLightboxImage && (
               <div 
@@ -1507,14 +2472,52 @@ export default function App() {
                           <p className="text-[10px] uppercase font-mono tracking-widest text-[#00f0ff] font-bold">{currentT.trendingGlobal}</p>
                           <div className="grid grid-cols-1 gap-3">
                             {trendingMovies.map((movie) => (
-                              <div key={movie.id} className="bg-black/60 border border-gray-900 p-3 rounded-xl flex gap-3 relative overflow-hidden">
-                                <div className="space-y-1 flex-1">
-                                  <span className="text-[8px] bg-cyan-950 text-cyan-400 px-1 py-0.2 rounded uppercase font-mono border border-cyan-800">
-                                    {movie.indie ? currentT.indie : currentT.globalPro}
-                                  </span>
-                                  <h4 className="text-xs font-bold text-white mt-1">{movie.title} ({movie.year})</h4>
-                                  <p className="text-[10px] text-cyan-400/90 font-mono">{movie.genre}</p>
-                                  <p className="text-[11px] text-gray-400 line-clamp-2 leading-relaxed">{movie.description}</p>
+                              <div key={movie.id} className="bg-[#050505] border border-gray-900 p-3 rounded-xl flex gap-3 relative overflow-hidden items-center group">
+                                {movie.backdropUrl && (
+                                  <div 
+                                    onClick={() => {
+                                      setZoomedImage(movie.backdropUrl);
+                                      setZoomScale(1);
+                                    }}
+                                    className="w-16 h-16 rounded-lg overflow-hidden shrink-0 bg-gray-950 border border-gray-900/60 shadow-[0_0_10px_rgba(0,0,0,0.5)] relative cursor-zoom-in group-hover:border-cyan-500/30 transition-all text-center self-start"
+                                    title="Click to Zoom Frame"
+                                  >
+                                    <img 
+                                      src={movie.backdropUrl} 
+                                      className="w-full h-full object-cover transition-transform group-hover:scale-105 duration-300" 
+                                      alt={movie.title} 
+                                      referrerPolicy="no-referrer"
+                                    />
+                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                      <span className="text-[7px] font-mono text-cyan-400 font-bold">ZOOM</span>
+                                    </div>
+                                  </div>
+                                )}
+                                <div className="space-y-1 flex-1 text-left min-w-0">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[8px] bg-cyan-950 text-cyan-400 px-1.5 py-0.5 rounded uppercase font-mono border border-cyan-900/40 font-bold truncate">
+                                      {movie.genre || (movie.indie ? currentT.indie : currentT.globalPro)}
+                                    </span>
+                                    <span className="text-[8px] text-gray-500 font-mono font-semibold uppercase tracking-wider shrink-0">
+                                      BY {movie.director.split(" ")[0]}
+                                    </span>
+                                  </div>
+                                  <h4 className="text-xs font-bold text-white mt-1 leading-tight truncate">{movie.title}</h4>
+                                  <p className="text-[10px] text-gray-400 line-clamp-2 leading-relaxed">{movie.description}</p>
+                                  
+                                  <div className="flex items-center gap-1.5 pt-1.5 border-t border-gray-950 mt-1">
+                                    <span className="text-[8.5px] text-gray-500 font-mono font-medium">
+                                      🕒 {getRelativeTime(movie.createdAt, lang)}
+                                    </span>
+                                    <button 
+                                      onClick={() => handleStartDMFromFeed(movie)}
+                                      className="ml-auto flex items-center gap-1 px-2.5 py-1 text-[9px] bg-cyan-950/70 hover:bg-cyan-900/80 border border-cyan-800/40 text-cyan-400 rounded-lg cursor-pointer transition-all hover:scale-[1.04] shrink-0 font-bold uppercase tracking-wider font-mono shadow-[0_0_10px_rgba(6,182,212,0.15)]"
+                                      title="Instant Direct Message"
+                                    >
+                                      <Send className="w-2.5 h-2.5" />
+                                      {lang === "en" ? "Message" : "نامە"}
+                                    </button>
+                                  </div>
                                 </div>
                               </div>
                             ))}
@@ -1528,22 +2531,71 @@ export default function App() {
                 {/* TAB SAKO */}
                 {activeTab === "sako" && (
                   <div className="p-4 space-y-6 flex-1 flex flex-col text-left">
-                    <div className="space-y-1">
-                      <h2 className="text-sm uppercase font-mono tracking-widest text-[#00f0ff] font-bold">{currentT.navSako}</h2>
-                      <p className="text-xs text-gray-500">
-                        {lang === "en" 
-                          ? "Discover and book verified film artists, coordinators, and directors of photography." 
-                          : "باشترین و بەناوبانگترین سینەماکاران، دەرهێنەران و وێنەگران بدۆزەرەوە."}
-                      </p>
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="space-y-1">
+                        <h2 className="text-sm uppercase font-mono tracking-widest text-[#00f0ff] font-bold">{currentT.navSako}</h2>
+                        <p className="text-xs text-gray-500">
+                          {lang === "en" 
+                            ? "Discover and book verified film artists." 
+                            : "باشترین و بەناوبانگترین سینەماکاران بدۆزەرەوە."}
+                        </p>
+                      </div>
+                      <div className="shrink-0">
+                        <select
+                          id="role-filter-select"
+                          value={selectedRoleFilter}
+                          onChange={(e) => setSelectedRoleFilter(e.target.value)}
+                          className="bg-black text-[10px] text-cyan-400 font-mono font-bold uppercase tracking-wider rounded-lg p-1.5 border border-cyan-800/50 focus:outline-none focus:border-cyan-400 cursor-pointer"
+                        >
+                          <option value="All">All</option>
+                          <option value="Athlete">Athlete</option>
+                          <option value="Videographer">Videographer</option>
+                          <option value="Editor">Editor</option>
+                          <option value="Designer">Designer</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Filter chips for instant visual action */}
+                    <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+                      {["All", "Athlete", "Videographer", "Editor", "Designer"].map((role) => (
+                        <button
+                          key={role}
+                          onClick={() => setSelectedRoleFilter(role)}
+                          className={`text-[9px] font-mono uppercase font-bold tracking-wider px-3 py-1.5 rounded-lg border transition-all cursor-pointer shrink-0 ${
+                            selectedRoleFilter === role 
+                              ? "bg-cyan-950 text-cyan-400 border-cyan-500/40 shadow-[0_0_10px_rgba(6,182,212,0.1)]" 
+                              : "bg-[#050505] text-gray-400 border-gray-900 hover:border-gray-800"
+                          }`}
+                        >
+                          {role}
+                        </button>
+                      ))}
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">
-                      {creators.map((c) => (
-                        <div 
-                          key={c.id} 
-                          onClick={() => setSelectedCreatorId(c.id)}
-                          className="bg-[#080808] border border-gray-900 rounded-xl overflow-hidden cursor-pointer transition-all hover:border-cyan-400/40 active:scale-98"
-                        >
+                      {(() => {
+                        const filtered = creators.filter((c) => {
+                          if (selectedRoleFilter === "All") return true;
+                          const roleLower = c.role.toLowerCase();
+                          const filterLower = selectedRoleFilter.toLowerCase();
+                          return roleLower.includes(filterLower);
+                        });
+                        
+                        if (filtered.length === 0) {
+                          return (
+                            <div className="col-span-2 py-10 text-center text-xs text-gray-500 font-mono uppercase tracking-wider border border-dashed border-gray-900 rounded-2xl">
+                              {lang === "en" ? "No profiles found for this role" : "هیچ پرۆفایلێک بۆ ئەم جۆرە نەدۆزرایەوە"}
+                            </div>
+                          );
+                        }
+                        
+                        return filtered.map((c) => (
+                          <div 
+                            key={c.id} 
+                            onClick={() => setSelectedCreatorId(c.id)}
+                            className="bg-[#080808] border border-gray-900 rounded-xl overflow-hidden cursor-pointer transition-all hover:border-cyan-400/40 active:scale-98"
+                          >
                           <div className="h-28 relative bg-slate-900">
                             {c.portfolio.length > 0 ? (
                               <img src={c.portfolio[0].url} className="w-full h-full object-cover" alt="" />
@@ -1565,6 +2617,49 @@ export default function App() {
                             </p>
                           </div>
                         </div>
+                        ));
+                      })()}
+                    </div>
+                  </div>
+                )}
+
+                {/* TAB VIDEOS (REELS/SHORTS STYLE DISPLAY) */}
+                {activeTab === "videos" && (
+                  <div className="absolute inset-x-0 top-0 bottom-16 bg-black flex flex-col z-20 overflow-hidden">
+                    {/* Header Overlay */}
+                    <div className="absolute top-0 inset-x-0 bg-gradient-to-b from-black/95 via-black/30 to-transparent px-4 py-4.5 flex justify-between items-center z-30 pointer-events-none">
+                      <div className="text-left">
+                        <h2 className="text-xs font-bold font-mono uppercase tracking-widest text-cyan-400 flex items-center gap-1.5 leading-none">
+                          <Clapperboard className="w-4 h-4 text-cyan-400 animate-pulse" />
+                          <span>{lang === "en" ? "Cinematic Feed" : "ڤیدیۆکانی کار"}</span>
+                        </h2>
+                        <p className="text-[8px] text-gray-400 font-mono tracking-wider uppercase mt-1.5 leading-none">
+                          {lang === "en" ? "SWIPE VERTICALLY FOR RAW REELS" : "بۆ سەرەوە بیبەم بۆ بینینی فیلمەکان"}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Reels Vertical Snap-Scroller */}
+                    <div className="flex-1 w-full bg-black overflow-y-scroll snap-y snap-mandatory select-none no-scrollbar h-full">
+                      {reels.map((reel) => (
+                        <InstagramReelCard
+                          key={reel.id}
+                          reel={reel}
+                          lang={lang}
+                          followingIds={followingIds}
+                          setFollowingIds={setFollowingIds}
+                          setReels={setReels}
+                          creators={creators}
+                          setCreators={setCreators}
+                          handleStartDM={handleStartDM}
+                          setChatInputText={setChatInputText}
+                          activeReelCommentsId={activeReelCommentsId}
+                          setActiveReelCommentsId={setActiveReelCommentsId}
+                          newReelComment={newReelComment}
+                          setNewReelComment={setNewReelComment}
+                          myProfile={myProfile}
+                          showToast={showToast}
+                        />
                       ))}
                     </div>
                   </div>
@@ -1574,24 +2669,40 @@ export default function App() {
                 {activeTab === "chat" && (
                   <div className="flex-1 flex flex-row h-full min-h-0 divide-x divide-gray-900">
                     {/* Conversations Sidebar List */}
-                    <div className="w-24 shrink-0 flex flex-col bg-black/40 py-2 divide-y divide-gray-950 overflow-y-auto no-scrollbar">
-                      <p className="text-[8px] font-mono text-gray-500 uppercase tracking-widest pb-2 text-center">{currentT.activeDms}</p>
-                      {conversations.map((c) => (
+                    {activeConvId === null && (
+                      <div className="w-full sm:w-24 shrink-0 flex flex-col bg-black/40 py-2 divide-y divide-gray-950 overflow-y-auto no-scrollbar">
+                        <p className="text-[8px] font-mono text-gray-500 uppercase tracking-widest pb-2 text-center">{currentT.activeDms}</p>
+                        
+                        {/* Create Group Button */}
                         <button
-                          key={c.id}
-                          onClick={() => setActiveConvId(c.id)}
-                          className={`w-full py-4 px-1 flex flex-col items-center justify-center transition-colors relative cursor-pointer ${activeConvId === c.id ? "bg-cyan-950/20 text-cyan-400" : "text-gray-400 hover:text-white"}`}
+                          onClick={() => {
+                            setGroupName("");
+                            setSelectedGroupMembers([]);
+                            setShowGroupModal(true);
+                          }}
+                          className="py-3 px-1 my-1 mx-2 bg-cyan-950/40 hover:bg-cyan-900/40 border border-cyan-850/30 rounded-xl flex flex-col items-center justify-center transition-all cursor-pointer text-cyan-400 font-mono shrink-0 hover:scale-[1.03] active:scale-95"
                         >
-                          <div className="relative">
-                            <img src={c.creatorAvatar} className="w-9 h-9 rounded-lg object-cover border border-gray-900" alt="" />
-                            {c.unread && (
-                              <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-cyan-400 rounded-full border border-black animate-ping" />
-                            )}
-                          </div>
-                          <span className="text-[9px] font-bold mt-1.5 truncate max-w-full text-center px-1 text-gray-200">{c.creatorName.split(" ")[0]}</span>
+                          <UserPlus className="w-4 h-4 mb-1" />
+                          <span className="text-[8px] font-bold uppercase tracking-wider">{lang === "en" ? "+ Group" : "+ گرووپ"}</span>
                         </button>
-                      ))}
-                    </div>
+
+                        {conversations.map((c) => (
+                          <button
+                            key={c.id}
+                            onClick={() => setActiveConvId(c.id)}
+                            className={`w-full py-4 px-1 flex flex-col items-center justify-center transition-colors relative cursor-pointer ${activeConvId === c.id ? "bg-cyan-950/20 text-cyan-400" : "text-gray-400 hover:text-white"}`}
+                          >
+                            <div className="relative">
+                              <img src={c.creatorAvatar} className="w-9 h-9 rounded-lg object-cover border border-gray-900" alt="" />
+                              {c.unread && (
+                                <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-cyan-400 rounded-full border border-black animate-ping" />
+                              )}
+                            </div>
+                            <span className="text-[9px] font-bold mt-1.5 truncate max-w-full text-center px-1 text-gray-200">{c.creatorName.split(" ")[0]}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
 
                     {/* Chat Window Panel */}
                     <div className="flex-1 flex flex-col bg-black/60 relative">
@@ -1601,22 +2712,76 @@ export default function App() {
                           if (!activeConv) return null;
                           return (
                             <div className="flex-1 flex flex-col min-h-0">
-                              {/* Thread top banner */}
-                              <div className="px-4 py-2 bg-black border-b border-gray-950 flex items-center justify-between shrink-0">
-                                <div className="text-left">
-                                  <h4 className="text-xs font-bold text-white leading-tight">{activeConv.creatorName}</h4>
-                                  <p className="text-[9px] font-mono text-cyan-400">{activeConv.creatorRole}</p>
+                              {/* Thread top banner with Custom Full-Screen Back Interaction */}
+                              <div className="px-4 py-3 bg-black border-b border-gray-950 flex items-center gap-3 shrink-0">
+                                <button 
+                                  onClick={() => setActiveConvId(null)}
+                                  className="p-1 text-cyan-400 hover:text-white cursor-pointer active:scale-90"
+                                >
+                                  <ChevronLeft className="w-5 h-5" />
+                                </button>
+                                
+                                <img src={activeConv.creatorAvatar} className="w-8 h-8 rounded-lg object-cover border border-gray-850 shrink-0" alt="" />
+                                
+                                <div className="text-left flex-1 min-w-0">
+                                  <h4 className="text-xs font-bold text-white leading-tight truncate">{activeConv.creatorName}</h4>
+                                  <p className="text-[9px] font-mono text-cyan-400 leading-none mt-1 truncate">{activeConv.creatorRole}</p>
                                 </div>
                               </div>
 
-                              {/* Message bubble track */}
-                              <div className="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar max-h-[580px]">
+                              {/* Message bubble track fully expanded in viewport */}
+                              <div className="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar">
                                 {activeConv.messages.map((m) => {
                                   const isMe = m.senderId === "me";
+                                  const senderCreator = activeConv.isGroup && !isMe 
+                                    ? creators.find(cr => cr.id === m.senderId)
+                                    : null;
+
                                   return (
                                     <div key={m.id} className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}>
+                                      {senderCreator && (
+                                        <div className="flex items-center gap-1 mb-1 px-1">
+                                          <img src={senderCreator.avatarUrl} className="w-3.5 h-3.5 rounded-full object-cover border border-cyan-800/40" alt="" />
+                                          <span className="text-[8px] font-mono text-cyan-400 font-bold">{senderCreator.name}</span>
+                                        </div>
+                                      )}
                                       <div className={`max-w-[85%] rounded-2xl px-3 py-2.5 text-xs text-left ${isMe ? "bg-cyan-950/70 text-cyan-400 border border-cyan-500/20 rounded-tr-none" : "bg-gray-950 text-gray-300 border border-gray-900 rounded-tl-none"}`}>
-                                        <p className="leading-relaxed whitespace-pre-wrap">{m.text}</p>
+                                        {m.text && !m.mediaUrl && !m.liveLocation && (
+                                          <p className="leading-relaxed whitespace-pre-wrap">{m.text}</p>
+                                        )}
+
+                                        {m.mediaUrl && (
+                                          <div className="space-y-1.5 max-w-full">
+                                            {m.mediaType === "video" ? (
+                                              <div className="rounded-xl overflow-hidden max-w-[200px] aspect-video bg-black/80 border border-cyan-955/30 relative">
+                                                <video src={m.mediaUrl} controls autoPlay loop muted className="w-full h-full object-cover" />
+                                              </div>
+                                            ) : (
+                                              <div 
+                                                className="rounded-xl overflow-hidden max-w-[200px] aspect-video bg-black/80 border border-gray-900 relative group cursor-pointer"
+                                                onClick={() => {
+                                                  setZoomedImage(m.mediaUrl);
+                                                  setZoomScale(1);
+                                                }}
+                                              >
+                                                <img src={m.mediaUrl} className="w-full h-full object-cover" alt="" referrerPolicy="no-referrer" />
+                                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                  <span className="text-[7.5px] font-mono text-cyan-400 bg-black/90 px-1.5 py-0.5 rounded border border-cyan-800">CLICK TO ZOOM</span>
+                                                </div>
+                                              </div>
+                                            )}
+                                            <p className="text-[9px] text-gray-400 italic font-mono leading-tight">{m.text}</p>
+                                          </div>
+                                        )}
+
+                                        {m.liveLocation && (
+                                          <LiveLocationBubble 
+                                            lat={m.liveLocation.lat} 
+                                            lng={m.liveLocation.lng} 
+                                            expiresAt={m.liveLocation.expiresAt} 
+                                            lang={lang} 
+                                          />
+                                        )}
                                       </div>
                                       <span className="text-[8px] font-mono text-gray-500 mt-1 uppercase tracking-wider">{m.timestamp}</span>
                                     </div>
@@ -1627,18 +2792,49 @@ export default function App() {
 
                               {/* Chat typing field */}
                               <div className="p-3 bg-[#060606] border-t border-gray-950 shrink-0">
-                                <div className="flex items-center gap-2 bg-black rounded-xl p-1.5 border border-gray-900 focus-within:border-cyan-400/40">
+                                <div className="flex items-center gap-1.5 bg-black rounded-xl p-1.5 border border-gray-900 focus-within:border-cyan-400/40">
                                   <input 
                                     type="text" 
                                     placeholder={currentT.chatInputPlaceholder}
                                     value={chatInputText}
                                     onChange={(e) => setChatInputText(e.target.value)}
                                     onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
-                                    className="flex-1 bg-transparent text-xs text-white px-2 focus:outline-none placeholder-gray-600"
+                                    className="flex-1 bg-transparent text-xs text-white px-2 focus:outline-none placeholder-gray-600 min-w-0"
                                   />
+                                  
+                                  <input 
+                                    type="file" 
+                                    ref={chatMediaInputRef}
+                                    accept="image/*,video/*"
+                                    className="hidden"
+                                    onChange={(e) => {
+                                      if (e.target.files && e.target.files[0]) {
+                                        handleSendMediaMessage(e.target.files[0]);
+                                      }
+                                    }}
+                                  />
+                                  
+                                  <button 
+                                    type="button"
+                                    onClick={() => chatMediaInputRef.current?.click()}
+                                    className="text-gray-500 hover:text-cyan-400 p-1 rounded transition-colors cursor-pointer shrink-0"
+                                    title="Send Photo or Video"
+                                  >
+                                    <ImageIcon className="w-4 h-4" />
+                                  </button>
+                                  
+                                  <button 
+                                    type="button"
+                                    onClick={handleSendLiveLocation}
+                                    className="text-gray-500 hover:text-cyan-400 p-1 rounded transition-colors cursor-pointer shrink-0"
+                                    title="Share 10-Min Live Location"
+                                  >
+                                    <Navigation className="w-4 h-4" />
+                                  </button>
+
                                   <button 
                                     onClick={handleSendMessage}
-                                    className="bg-cyan-950 hover:bg-cyan-900 text-cyan-400 p-2 rounded-lg border border-cyan-400/20 cursor-pointer"
+                                    className="bg-cyan-950 hover:bg-cyan-900 text-cyan-400 p-2 rounded-lg border border-cyan-400/20 cursor-pointer shrink-0"
                                   >
                                     <Send className="w-3.5 h-3.5" />
                                   </button>
@@ -1754,7 +2950,36 @@ export default function App() {
                     {/* Self profile layout rendering */}
                     <div className="space-y-4">
                       <div className="bg-[#080808] border border-gray-900 rounded-xl p-4 flex gap-4 items-center">
-                        <img src={myProfile.avatarUrl} className="w-14 h-14 rounded-lg object-cover border border-cyan-400 bg-black" alt="" />
+                        <input 
+                          type="file" 
+                          ref={profileImgInputRef}
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files[0]) {
+                              handleProfilePhotoChange(e.target.files[0]);
+                            }
+                          }}
+                          accept="image/*"
+                          className="hidden"
+                        />
+                        <div className="relative group shrink-0">
+                          <img src={myProfile.avatarUrl} className="w-14 h-14 rounded-lg object-cover border border-cyan-400 bg-black" alt="" />
+                          <button 
+                            type="button"
+                            onClick={() => profileImgInputRef.current?.click()}
+                            className="absolute inset-0 bg-black/75 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-lg transition-all text-cyan-400 cursor-pointer border border-cyan-400/30"
+                            title="Change Photo"
+                          >
+                            <Camera className="w-4 h-4" />
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => profileImgInputRef.current?.click()}
+                            className="absolute -bottom-1 -right-1 bg-cyan-950 text-cyan-400 p-1 rounded-md border border-cyan-800 hover:bg-cyan-900 shadow-md cursor-pointer flex items-center justify-center"
+                            title="Change Photo"
+                          >
+                            <Camera className="w-2.5 h-2.5" />
+                          </button>
+                        </div>
                         <div className="flex-1 min-w-0">
                           <span className="text-[9px] uppercase tracking-wider font-mono text-cyan-400 font-bold bg-cyan-950 px-2 py-0.5 rounded border border-cyan-500/20">{myProfile.role}</span>
                           <h3 className="text-md font-bold text-white mt-1 truncation">{myProfile.name}</h3>
@@ -1845,61 +3070,379 @@ export default function App() {
           </div>
 
           {/* App primary bottom bar */}
-          <div 
-            style={{ position: 'fixed', bottom: 0, left: 0, width: '100%', zIndex: 50 }}
-            className="bg-[#030303]/95 backdrop-blur-md border-t border-gray-900 h-16 shrink-0 flex items-stretch justify-around"
-          >
-            <button 
-              id="nav-tab-biner"
-              onClick={() => {
-                setActiveTab("biner");
-                setSelectedCreatorId(null);
-              }}
-              className={`flex-1 flex flex-col items-center justify-center transition-colors cursor-pointer ${activeTab === "biner" ? "text-cyan-400" : "text-gray-500 hover:text-gray-300"}`}
+          {!(activeTab === "chat" && activeConvId !== null) && (
+            <div 
+              style={{ position: 'fixed', bottom: 0, left: 0, width: '100%', zIndex: 50 }}
+              className="bg-[#030303]/95 backdrop-blur-md border-t border-gray-900 h-16 shrink-0 flex items-stretch justify-around"
             >
-              <Film className="w-5 h-5" />
-              <span className="text-[9px] font-mono font-bold mt-1 uppercase tracking-widest">{currentT.navBiner}</span>
-            </button>
+              <button 
+                id="nav-tab-biner"
+                onClick={() => {
+                  setActiveTab("biner");
+                  setSelectedCreatorId(null);
+                }}
+                className={`flex-1 flex flex-col items-center justify-center transition-colors cursor-pointer ${activeTab === "biner" ? "text-cyan-400" : "text-gray-500 hover:text-gray-300"}`}
+              >
+                <Film className="w-5 h-5" />
+                <span className="text-[9px] font-mono font-bold mt-1 uppercase tracking-widest">{currentT.navBiner}</span>
+              </button>
 
-            <button 
-              id="nav-tab-sako"
-              onClick={() => {
-                setActiveTab("sako");
-                setSelectedCreatorId(null);
-              }}
-              className={`flex-1 flex flex-col items-center justify-center transition-colors cursor-pointer ${activeTab === "sako" ? "text-cyan-400" : "text-gray-500 hover:text-gray-300"}`}
-            >
-              <Users className="w-5 h-5" />
-              <span className="text-[9px] font-mono font-bold mt-1 uppercase tracking-widest">{currentT.navSako}</span>
-            </button>
+              <button 
+                id="nav-tab-sako"
+                onClick={() => {
+                  setActiveTab("sako");
+                  setSelectedCreatorId(null);
+                }}
+                className={`flex-1 flex flex-col items-center justify-center transition-colors cursor-pointer ${activeTab === "sako" ? "text-cyan-400" : "text-gray-500 hover:text-gray-300"}`}
+              >
+                <Users className="w-5 h-5" />
+                <span className="text-[9px] font-mono font-bold mt-1 uppercase tracking-widest">{currentT.navSako}</span>
+              </button>
 
-            <button 
-              id="nav-tab-chat"
-              onClick={() => {
-                setActiveTab("chat");
-                setSelectedCreatorId(null);
-              }}
-              className={`flex-1 flex flex-col items-center justify-center transition-colors cursor-pointer relative ${activeTab === "chat" ? "text-cyan-400" : "text-gray-500 hover:text-gray-300"}`}
-            >
-              <MessageSquare className="w-5 h-5" />
-              <span className="text-[9px] font-mono font-bold mt-1 uppercase tracking-widest">{lang === "en" ? "Chat" : "نامەکان"}</span>
-              {conversations.some(c => c.unread) && (
-                <span className="absolute top-3 right-8 w-2 h-2 bg-cyan-400 rounded-full" />
-              )}
-            </button>
+              <button 
+                id="nav-tab-plus"
+                type="button"
+                onClick={() => setShowAddPostModal(true)}
+                className="flex-1 flex flex-col items-center justify-center transition-all cursor-pointer text-cyan-400 hover:text-white"
+              >
+                <div className="bg-cyan-950/50 hover:bg-cyan-900/60 p-2 rounded-full border border-cyan-800/40 shadow-[0_0_15px_rgba(6,182,212,0.15)] hover:shadow-[0_0_20px_rgba(6,182,212,0.3)] transition-all">
+                  <Plus className="w-5 h-5" />
+                </div>
+                <span className="text-[8px] font-mono font-bold mt-1 uppercase tracking-widest">{lang === "en" ? "New" : "نوێ"}</span>
+              </button>
 
-            <button 
-              id="nav-tab-my-profile"
-              onClick={() => {
-                setActiveTab("my-profile");
-                setSelectedCreatorId(null);
-              }}
-              className={`flex-1 flex flex-col items-center justify-center transition-colors cursor-pointer ${activeTab === "my-profile" ? "text-cyan-400" : "text-gray-500 hover:text-gray-300"}`}
-            >
-              <Users className="w-5 h-5" />
-              <span className="text-[9px] font-mono font-bold mt-1 uppercase tracking-widest">{lang === "en" ? "Profile" : "من"}</span>
-            </button>
-          </div>
+              <button 
+                id="nav-tab-videos"
+                onClick={() => {
+                  setActiveTab("videos");
+                  setSelectedCreatorId(null);
+                }}
+                className={`flex-1 flex flex-col items-center justify-center transition-colors cursor-pointer ${activeTab === "videos" ? "text-cyan-400" : "text-gray-500 hover:text-gray-300"}`}
+              >
+                <Clapperboard className="w-5 h-5 animate-pulse" />
+                <span className="text-[9px] font-mono font-bold mt-1 uppercase tracking-widest">{lang === "en" ? "Videos" : "ڤیدیۆ"}</span>
+              </button>
+
+              <button 
+                id="nav-tab-chat"
+                onClick={() => {
+                  setActiveTab("chat");
+                  setSelectedCreatorId(null);
+                }}
+                className={`flex-1 flex flex-col items-center justify-center transition-colors cursor-pointer relative ${activeTab === "chat" ? "text-cyan-400" : "text-gray-500 hover:text-gray-300"}`}
+              >
+                <MessageSquare className="w-5 h-5" />
+                <span className="text-[9px] font-mono font-bold mt-1 uppercase tracking-widest">{lang === "en" ? "Chat" : "نامەکان"}</span>
+                {conversations.some(c => c.unread) && (
+                  <span className="absolute top-3 right-8 w-2 h-2 bg-cyan-400 rounded-full" />
+                )}
+              </button>
+
+              <button 
+                id="nav-tab-my-profile"
+                onClick={() => {
+                  setActiveTab("my-profile");
+                  setSelectedCreatorId(null);
+                }}
+                className={`flex-1 flex flex-col items-center justify-center transition-colors cursor-pointer ${activeTab === "my-profile" ? "text-cyan-400" : "text-gray-500 hover:text-gray-300"}`}
+              >
+                <Users className="w-5 h-5" />
+                <span className="text-[9px] font-mono font-bold mt-1 uppercase tracking-widest">{lang === "en" ? "Profile" : "من"}</span>
+              </button>
+            </div>
+          )}
+
+          {/* NEW POST MODAL */}
+          {showAddPostModal && (
+            <div className="fixed inset-0 bg-[#020202]/90 backdrop-blur-md flex items-center justify-center p-4 z-[100] animate-fadeIn">
+              <div className="bg-[#080808] border border-cyan-500/20 rounded-2xl p-6 w-full max-w-sm space-y-4 shadow-[0_0_50px_rgba(6,182,212,0.15)] ring-1 ring-cyan-400/20 text-left">
+                <div className="flex items-center justify-between border-b border-gray-900 pb-3">
+                  <h3 className="text-sm font-bold font-mono uppercase tracking-widest text-cyan-400 flex items-center gap-1.5 font-bold">
+                    <Plus className="w-4 h-4 text-cyan-400" />
+                    {lang === "en" ? "Publish Work" : "بڵاوکردنەوەی کار"}
+                  </h3>
+                  <button 
+                    type="button" 
+                    onClick={() => setShowAddPostModal(false)}
+                    className="text-gray-500 hover:text-white transition-colors cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <form onSubmit={handleSaveNewPost} className="space-y-4 text-xs">
+                  <div className="space-y-1">
+                    <label className="text-gray-400 font-mono font-bold uppercase tracking-wider text-[9px]">
+                      {lang === "en" ? "Title" : "ناونیشانی کار"}
+                    </label>
+                    <input 
+                      type="text" 
+                      required
+                      className="w-full bg-black rounded-xl p-2.5 border border-gray-900 text-white focus:outline-none focus:border-cyan-400/50 transition-colors" 
+                      placeholder={lang === "en" ? "e.g., Chromatic Noir" : "بۆ نموونە: تیشکی مۆر"}
+                      value={newPostTitle} 
+                      onChange={(e) => setNewPostTitle(e.target.value)} 
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-gray-400 font-mono font-bold uppercase tracking-wider text-[9px]">
+                        {lang === "en" ? "Category / Role" : "جۆر / دەور"}
+                      </label>
+                      <select 
+                        className="w-full bg-black rounded-xl p-2.5 border border-gray-900 text-white focus:outline-none focus:border-cyan-400/50 transition-colors cursor-pointer"
+                        value={newPostCategory} 
+                        onChange={(e) => setNewPostCategory(e.target.value)}
+                      >
+                        <option value="Athlete">{lang === "en" ? "Athlete" : "وەرزشکار"}</option>
+                        <option value="Videographer">{lang === "en" ? "Videographer" : "وێنەگر"}</option>
+                        <option value="Editor">{lang === "en" ? "Editor" : "مۆنتێر"}</option>
+                        <option value="Designer">{lang === "en" ? "Designer" : "دیزاینەر"}</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-gray-400 font-mono font-bold uppercase tracking-wider text-[9px]">
+                        {lang === "en" ? "Year" : "ساڵ"}
+                      </label>
+                      <input 
+                        type="text" 
+                        className="w-full bg-black rounded-xl p-2.5 border border-gray-900 text-white focus:outline-none focus:border-cyan-400/50 transition-colors" 
+                        value={newPostYear} 
+                        onChange={(e) => setNewPostYear(e.target.value)} 
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-gray-400 font-mono font-bold uppercase tracking-wider text-[9px]">
+                      {lang === "en" ? "Description" : "کورتەی کار"}
+                    </label>
+                    <textarea 
+                      className="w-full bg-black rounded-xl p-2.5 border border-gray-900 text-white focus:outline-none focus:border-cyan-400/50 transition-colors h-16 resize-none" 
+                      placeholder={lang === "en" ? "Describe your spectacular work..." : "کورتەیەک بنووسە لەسەر کارەکەت..."}
+                      value={newPostDesc} 
+                      onChange={(e) => setNewPostDesc(e.target.value)} 
+                    />
+                  </div>
+
+                  {/* PHOTO INPUT WITH DUAL DRAG-DROP OR URL FALLBACK */}
+                  <div className="space-y-2">
+                    <label className="text-gray-400 font-mono font-bold uppercase tracking-wider text-[9px]">
+                      {lang === "en" ? "Work Backdrop Image" : "وێنەی پاشبنەمای کار"}
+                    </label>
+                    <input 
+                      type="file" 
+                      ref={postImgInputRef}
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          handlePostPhotoUpload(e.target.files[0]);
+                        }
+                      }}
+                    />
+                    
+                    {newPostPhoto ? (
+                      <div className="relative rounded-xl overflow-hidden aspect-video bg-black/60 border border-cyan-800/40">
+                        <img src={newPostPhoto} className="w-full h-full object-cover" alt="Preview" referrerPolicy="no-referrer" />
+                        <button 
+                          type="button" 
+                          onClick={() => setNewPostPhoto("")}
+                          className="absolute top-2 right-2 bg-black/80 rounded-full p-1 border border-cyan-800 text-cyan-400 hover:text-white cursor-pointer"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div 
+                        onClick={() => postImgInputRef.current?.click()}
+                        className="border border-dashed border-gray-800 hover:border-cyan-400/40 rounded-xl p-5 flex flex-col items-center justify-center gap-1.5 cursor-pointer bg-black/40 hover:bg-cyan-950/15 transition-all text-center group"
+                      >
+                        <Camera className="w-5 h-5 text-gray-600 group-hover:text-cyan-400 transition-colors" />
+                        <div className="space-y-0.5">
+                          <p className="text-[10px] text-gray-400 font-medium">{lang === "en" ? "Click to Upload" : "کلیک بکە بۆ بارکردنی وێنە"}</p>
+                          <p className="text-[8.5px] text-gray-600">{lang === "en" ? "Supports PNG, JPG, WebP" : "پشتیگیری فایلی وێنەیی دەکات"}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="text-center font-mono text-[8px] text-gray-600">
+                      {lang === "en" ? "— OR PASTE IMAGE URL —" : "— یاخود بەستەری وێنەکە دابنێ —"}
+                    </div>
+
+                    <input 
+                      type="text" 
+                      className="w-full bg-black rounded-xl p-2 border border-gray-900 text-gray-300 focus:outline-none focus:border-cyan-400/40 transition-colors text-[10px]" 
+                      placeholder="https://images.unsplash.com/..."
+                      value={newPostPhoto} 
+                      onChange={(e) => setNewPostPhoto(e.target.value)} 
+                    />
+                  </div>
+
+                  <div className="flex gap-2 justify-end pt-2 border-t border-gray-900">
+                    <button 
+                      type="button"
+                      onClick={() => setShowAddPostModal(false)} 
+                      className="px-3.5 py-2 rounded-xl text-xs bg-gray-950 text-gray-400 hover:bg-gray-900 border border-gray-900/60 transition-colors cursor-pointer font-mono font-semibold"
+                    >
+                      {lang === "en" ? "Cancel" : "پاشگەزبوونەوە"}
+                    </button>
+                    <button 
+                      type="submit" 
+                      className="px-3.5 py-2 rounded-xl text-xs bg-cyan-950 text-cyan-400 border border-cyan-800 hover:bg-cyan-900 transition-colors cursor-pointer font-mono font-bold"
+                    >
+                      {lang === "en" ? "Publish Post" : "بڵاوکردنەوە"}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* IMAGE LIGHTBOX ZOOM OVERLAY */}
+          {zoomedImage && (
+            <div className="fixed inset-0 bg-black/95 z-[150] flex flex-col items-center justify-center p-4">
+              <div className="absolute top-4 right-4 flex items-center gap-2">
+                <button
+                  onClick={() => setZoomScale(prev => Math.max(1, prev - 0.5))}
+                  className="bg-black/80 hover:bg-white/10 text-white px-3 py-2 rounded-full border border-gray-800 transition-all font-mono font-bold text-xs cursor-pointer"
+                >
+                  -
+                </button>
+                <button
+                  onClick={() => setZoomScale(prev => Math.min(3, prev + 0.5))}
+                  className="bg-black/80 hover:bg-white/10 text-white px-3 py-2 rounded-full border border-gray-800 transition-all font-mono font-bold text-xs cursor-pointer"
+                >
+                  +
+                </button>
+                <button
+                  onClick={() => {
+                    setZoomedImage(null);
+                    setZoomScale(1);
+                  }}
+                  className="bg-black/80 hover:bg-white/10 text-white p-2.5 rounded-full border border-gray-800 transition-all cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div 
+                className="max-w-full max-h-[82vh] overflow-auto flex items-center justify-center relative touch-none"
+                onDoubleClick={() => setZoomScale(scale => scale === 1 ? 2 : 1)}
+              >
+                <img 
+                  src={zoomedImage} 
+                  style={{ transform: `scale(${zoomScale})`, transition: 'transform 0.2s ease-in-out' }}
+                  className="max-w-full max-h-[72vh] object-contain rounded-lg shadow-2xl" 
+                  alt="Zoomed Work Frame" 
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+
+              <p className="text-[10px] text-gray-500 font-mono mt-4 uppercase tracking-widest text-center">
+                {lang === "en" ? "Double-Tap to Quick Zoom 200% • Pinch/Use Buttons" : "دووجار کلیک بکە بۆ گەورەکردن • دوگمەکان بەکاربهێنە"}
+              </p>
+            </div>
+          )}
+
+          {/* GROUP CHAT CREATOR MODAL */}
+          {showGroupModal && (
+            <div className="fixed inset-0 bg-[#020202]/90 backdrop-blur-md flex items-center justify-center p-4 z-[100] animate-fadeIn">
+              <div className="bg-[#080808] border border-cyan-500/20 rounded-2xl p-5 w-full max-w-sm space-y-4 shadow-[0_0_50px_rgba(6,182,212,0.15)] ring-1 ring-cyan-400/20 text-left text-xs">
+                <div className="flex items-center justify-between border-b border-gray-900 pb-3">
+                  <h3 className="text-sm font-bold font-mono uppercase tracking-widest text-cyan-400 flex items-center gap-1.5 font-bold">
+                    <UserPlus className="w-4 h-4 text-cyan-400" />
+                    {lang === "en" ? "Create Group Chat" : "دروستکردنی گرووپ"}
+                  </h3>
+                  <button 
+                    type="button" 
+                    onClick={() => setShowGroupModal(false)}
+                    className="text-gray-500 hover:text-white transition-colors cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-gray-400 font-mono font-bold uppercase tracking-wider text-[9px]">
+                    {lang === "en" ? "Group Title" : "ناوی گرووپ"}
+                  </label>
+                  <input 
+                    type="text" 
+                    required
+                    className="w-full bg-black rounded-xl p-2.5 border border-gray-900 text-white focus:outline-none focus:border-cyan-400/50 transition-colors" 
+                    placeholder={lang === "en" ? "e.g., Kurdistan Creative Crew" : "بۆ نموونە: تیمی بەرهەمهێنانی کوردستان"}
+                    value={groupName} 
+                    onChange={(e) => setGroupName(e.target.value)} 
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <label className="text-gray-400 font-mono font-bold uppercase tracking-wider text-[9px]">
+                      {lang === "en" ? "Select Crew Members" : "دیاریکردنی ئەندامان"}
+                    </label>
+                    <span className="font-mono text-[9px] font-bold text-cyan-400">
+                      {selectedGroupMembers.length + 1}/12 {lang === "en" ? "Max" : "ئەندام"}
+                    </span>
+                  </div>
+                  
+                  <div className="max-h-36 overflow-y-auto divide-y divide-gray-950 border border-gray-900 rounded-xl bg-black/40 p-1 no-scrollbar space-y-1">
+                    {creators.map((c) => {
+                      const isSelected = selectedGroupMembers.includes(c.id);
+                      return (
+                        <div 
+                          key={c.id}
+                          onClick={() => {
+                            if (isSelected) {
+                              setSelectedGroupMembers(prev => prev.filter(id => id !== c.id));
+                            } else {
+                              if (selectedGroupMembers.length >= 11) {
+                                showToast(lang === "en" ? "Maximum 12 members allowed in a group." : "تکایە لە ١٢ ئەندام زیاتر ڕێگەنەدراوە.");
+                                return;
+                              }
+                              setSelectedGroupMembers(prev => [...prev, c.id]);
+                            }
+                          }}
+                          className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors ${isSelected ? "bg-cyan-950/20 border border-cyan-800/10 text-cyan-300" : "hover:bg-white/5 text-gray-400"}`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <img src={c.avatarUrl} className="w-6 h-6 rounded-md object-cover border border-gray-900" alt="" />
+                            <div className="text-left leading-tight">
+                              <p className="font-bold text-[10px] text-gray-200">{c.name}</p>
+                              <p className="text-[8px] font-mono text-cyan-400/80">{c.role}</p>
+                            </div>
+                          </div>
+                          <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors ${isSelected ? "bg-cyan-500 border-cyan-500 text-black" : "border-gray-800 bg-transparent"}`}>
+                            {isSelected && <span className="font-bold text-[8px]">✓</span>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="flex gap-2 justify-end pt-2 border-t border-gray-900">
+                  <button 
+                    type="button"
+                    onClick={() => setShowGroupModal(false)} 
+                    className="px-3.5 py-2 rounded-xl text-xs bg-gray-950 text-gray-400 hover:bg-gray-900 border border-gray-900/60 transition-colors cursor-pointer font-mono font-semibold"
+                  >
+                    {lang === "en" ? "Cancel" : "پاشگەزبوونەوە"}
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={handleCreateGroupChat} 
+                    className="px-3.5 py-2 rounded-xl text-xs bg-cyan-950 text-cyan-400 border border-cyan-800 hover:bg-cyan-900 transition-colors cursor-pointer font-mono font-bold"
+                  >
+                    {lang === "en" ? "Initialize" : "دروستکردن"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </motion.div>
