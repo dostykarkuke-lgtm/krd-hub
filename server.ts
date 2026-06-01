@@ -202,9 +202,9 @@ app.post("/api/chat/message", (req, res) => {
 
 // -----------------------------------------------------------
 
-// 1. Film Recommendations API (AI-Powered Mood Search)
+// 1. Film Recommendations & Cinematic Creative Partner API (AI-Powered)
 app.post("/api/mood-search", async (req, res) => {
-  const { prompt } = req.body;
+  const { prompt, history, lang } = req.body;
   if (!prompt || typeof prompt !== "string") {
     return res.status(400).json({ error: "A valid string prompt is required." });
   }
@@ -212,6 +212,7 @@ app.post("/api/mood-search", async (req, res) => {
   // Fallback static dataset in case API key is missing or calls fail
   const fallbackMovies = [
     {
+      id: "f-1",
       title: "Interstellar",
       year: "2014",
       genre: "Sci-Fi / Drama",
@@ -223,6 +224,7 @@ app.post("/api/mood-search", async (req, res) => {
       roleOpportunities: ["VFX Artist", "Composer", "Cinematographer", "Sci-Fi Consultant"]
     },
     {
+      id: "f-2",
       title: "Neon Horizon",
       year: "2025",
       genre: "Cyberpunk Thriller",
@@ -234,6 +236,7 @@ app.post("/api/mood-search", async (req, res) => {
       roleOpportunities: ["Lighting Director", "Cyberpunk Costume Designer", "Colorist", "Synths Sound Designer"]
     },
     {
+      id: "f-3",
       title: "The Quiet Depth",
       year: "2023",
       genre: "Psychological Suspense",
@@ -245,6 +248,7 @@ app.post("/api/mood-search", async (req, res) => {
       roleOpportunities: ["Sound Designer", "Underwater Camera Operator", "Foley Artist", "Lead Actress"]
     },
     {
+      id: "f-4",
       title: "Arrival",
       year: "2016",
       genre: "Drama / Sci-Fi",
@@ -258,26 +262,79 @@ app.post("/api/mood-search", async (req, res) => {
   ];
 
   if (!ai) {
-    // Return mock recommendations with a simulated reasoning delay
+    // Return mock partner response and recommended films with a simulated reasoning delay
     await new Promise((resolve) => setTimeout(resolve, 1000));
-    return res.json({ films: fallbackMovies, isFallback: true });
+    const isCkb = lang === "ckb";
+    const partnerResponse = isCkb
+      ? "تکایە کلیلی مەکۆ GEMINI_API_KEY چاڵاک بکە لە بەشی ڕێکخستنەکان تا وەڵامە قووڵە داهێنەرەکان بەدەست بهێنیت. لێرەدا چەند نموونەیەکی گشتی فیلمی سینەماییمان بۆ ئامادەکردوویت:"
+      : "Please configure GEMINI_API_KEY in the Settings > Secrets configuration panel to enable the high-fidelity Cinematic Creative Partner with active context memory, deep film feedback, and plot search. Heres a general list to inspire you:";
+    
+    return res.json({
+      partnerResponse,
+      films: fallbackMovies,
+      isFallback: true
+    });
   }
 
   try {
+    // 1. Map client history to Gemini Content array format to support context-awareness
+    const contents: any[] = [];
+    if (Array.isArray(history)) {
+      history.forEach((h: any) => {
+        contents.push({
+          role: h.role === "assistant" || h.role === "model" ? "model" : "user",
+          parts: [{ text: h.text }]
+        });
+      });
+    }
+    // Add current user prompt
+    contents.push({
+      role: "user",
+      parts: [{ text: prompt }]
+    });
+
+    const systemInstruction = `You are the professional "Cinematic Creative Partner" for Krd Hub (a premium Kurdish cinema collaborative workspace).
+Your persona is a highly experienced, professional film consultant, creative director, and cinematic historian.
+
+Your absolute key directives:
+1. Cinematic Expert Persona: When asked for movie ideas, film concepts, or script feedback, provide deep, creative, and structured responses. Highlight narrative themes, key plot points, visual motif/aesthetic/lighting directions, and camera suggestions (e.g., composition, color grading style). Output nicely formatted Markdown with headers, bullet points, and neat paragraphs.
+2. Movie Identification Mode: If a user provides a partial, vague, or complex plot description (e.g. "space docking rotating room movie", "the Kurdish classic where a boy runs with a glass of water", or "a movie about a quiet place where monsters hunt by sound"), cross-reference your extensive film knowledge and provide the correct movie title, release year, and director inside the conversation response.
+3. Context-Aware Responses: Maintain full awareness of previous logs in the conversation thread. Do not forget previous concepts, movie details, or questions. If the user asks a follow-up query, respond contextually without asking them to repeat details.
+4. Performance & Language: Respond in a professional, concise, elegant, and cinematic manner. Match the language of the user's input. If the user asks or interacts in Kurdish (Sorani Kurdish / کوردی سۆرانی), you MUST respond in beautifully phrased, natural, and correct Sorani Kurdish. If in English, respond in professional English.
+
+You MUST always return a JSON object with exactly two top-level keys:
+- "partnerResponse" (string): Your thorough, professional, markdown-formatted conversational response that acts as the Cinematic Creative Partner. Make sure this is helpful, deeply creative, and is formatted perfectly.
+- "films" (array): An array of 1 to 4 film objects corresponding to films mentioned in the conversation, recommended for the user, or identified based on their plot query. If a movie has been identified, put that identified movie as the first element of this array so that the user gets structured high-fidelity card feedback!
+
+Each film object in the "films" array MUST have these properties:
+- "title" (string): Film Title
+- "year" (string): Release Year
+- "genre" (string): Film genres
+- "description" (string): A short, evocative synopsis
+- "matchReason" (string): A concise, high-fidelity explanation of why the film is recommended or matched to the user's query/conversation
+- "director" (string): Director name
+- "rating" (string): Rating (e.g., "8.7/10")
+- "indie" (boolean): True if it is an indie, niche, or Kurdish local film; false if a major global blockbuster
+- "roleOpportunities" (array of strings): 3 to 4 professional production roles needed for a project like this (e.g., ["VFX Artist", "Composer", "Colorist", "Lead Editor"]).
+`;
+
     const response = await ai.models.generateContent({
       model: "gemini-3.5-flash",
-      contents: `Recommend 4 films matching the mood or prompt: "${prompt}". 
-      Return realistic films (can be famous classics, popular masterpieces, or highly matching indie films).
-      Format response as a JSON array inside a "films" property. Make sure to provide descriptive and beautiful field values.`,
+      contents: contents,
       config: {
+        systemInstruction,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
-          required: ["films"],
+          required: ["partnerResponse", "films"],
           properties: {
+            partnerResponse: {
+              type: Type.STRING,
+              description: "A professional, structured, beautifully formatted markdown response containing film feedback, ideas, suggestions, movie identification details, or cinematic consultation, matching the input language (Kurdish or English)."
+            },
             films: {
               type: Type.ARRAY,
-              description: "Array of recommended films matching the mood and prompt",
+              description: "Array of related film coordinates matching the cinematic criteria discussed",
               items: {
                 type: Type.OBJECT,
                 required: ["title", "year", "genre", "description", "matchReason", "director", "rating", "indie", "roleOpportunities"],
@@ -304,15 +361,32 @@ app.post("/api/mood-search", async (req, res) => {
     });
 
     const parsedData = JSON.parse(response.text || "{}");
-    if (parsedData && Array.isArray(parsedData.films)) {
-      return res.json({ films: parsedData.films, isFallback: false });
+    if (parsedData && parsedData.partnerResponse) {
+      // Formulate unique ids for React key mapping
+      const filmsWithIds = (parsedData.films || []).map((f: any, idx: number) => ({
+        ...f,
+        id: `movie-${Date.now()}-${idx}`
+      }));
+      return res.json({
+        partnerResponse: parsedData.partnerResponse,
+        films: filmsWithIds,
+        isFallback: false
+      });
     } else {
       throw new Error("Invalid output format from AI model response");
     }
   } catch (error) {
     console.error("Gemini API Error, falling back to static search:", error);
-    // Find some films from fallbackMovies that match words, or return full list
-    return res.json({ films: fallbackMovies, isFallback: true, error: "Using premium fallback recommendations due to transient model limits." });
+    const isCkb = lang === "ckb";
+    const partnerResponse = isCkb
+      ? "پەیوەندیەکە سەرکەوتوو نەبوو بەهۆی ڕاگرتنی ترافیک یان سنووردارکردنی کاتی. لێرەدا پێشنیارە گشتییەکانمان هەیە:"
+      : "We hit a transient connection barrier with the Creative Partner. Displaying fallback index recommendations below:";
+    return res.json({
+      partnerResponse,
+      films: fallbackMovies,
+      isFallback: true,
+      error: "Using premium fallback recommendations due to transient model limits."
+    });
   }
 });
 

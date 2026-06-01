@@ -11,6 +11,7 @@ export interface Movie {
   roleOpportunities?: string[];
   matchReason?: string;
   createdAt?: number; // Dynamic relative time
+  tags?: string[];
 }
 
 export interface SakoPortfolioItem {

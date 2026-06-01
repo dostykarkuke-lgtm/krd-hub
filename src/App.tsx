@@ -12,6 +12,10 @@ import {
   Eye, 
   Video, 
   X, 
+  Apple,
+  Mail,
+  Chrome, 
+  Facebook,
   Edit, 
   CheckCircle,
   Globe,
@@ -26,7 +30,10 @@ import {
   Volume2,
   VolumeX,
   UserPlus,
-  Share2
+  UserCheck,
+  Share2,
+  Trash2,
+  Settings
 } from "lucide-react";
 import { Movie, SakoCreator, SakoPortfolioItem, ChatConversation, ChatMessage } from "./types";
 import { initialTrendingMovies, initialCreators, initialConversations } from "./data";
@@ -119,9 +126,9 @@ const t = {
     navMyProfile: "My Profile",
     featuredRelease: "Featured Release",
     trendingGlobal: "Trending Global",
-    moodSearchTitle: "AI-Powered Mood Search",
-    moodSearchSub: "Describe an atmosphere or prompt to find matching cinematic structures.",
-    moodInputPlaceholder: "e.g., a dark neon cyberpunk suspense noir...",
+    moodSearchTitle: "AI Cinematic Creative Partner",
+    moodSearchSub: "Ask for movie ideas, film concepts, script feedback, or identify movies from vague plots contextually.",
+    moodInputPlaceholder: "Ask anything, e.g., 'Identify a movie about space docking with rotating scene' or 'Give me a sci-fi idea'...",
     globalSearchTitle: "Global Search Directory",
     globalSearchInputPlaceholder: "Search movies, genres, opportunities, or crew...",
     noResults: "No results matched your search term.",
@@ -210,9 +217,9 @@ const t = {
     navMyProfile: "پڕۆفایلی من",
     featuredRelease: "بڵاوکراوەی سەرەکی",
     trendingGlobal: "دەنگدانەوەی جیهانی",
-    moodSearchTitle: "گەڕانی کەشی فیلمەکان",
-    moodSearchSub: "وەسفی کەش یان دروستکراوەیەک بکە بۆ دۆزینەوەی پێکهاتەی گونجاوی سینەمایی.",
-    moodInputPlaceholder: "بۆ نموونە: فیلمێکی تاریکی سایبەرپەنک و نواری پڕ لە نهێنی...",
+    moodSearchTitle: "هاوبەشی داهێنەری سینەمایی AI",
+    moodSearchSub: "وەسفی کەش یان چیرۆکێک بکە بۆ دۆزینەوەی فیلم، فیدباکی نووسین، فێربوونی بیرۆکە بە سۆرانی ناوازە.",
+    moodInputPlaceholder: "پرسیار بکە، بۆ نموونە: 'پێشنیاری فیلمێکی نهێنی ئامێز بکە' یان 'فیدباک بۆ ئەم کورتە چیرۆکە بدە'...",
     globalSearchTitle: "نشینگەی گەڕانی گشتی",
     globalSearchInputPlaceholder: "بگەڕێ بۆ فیلم، ژانر، دەرفەتەکان یان ستاڤ...",
     noResults: "هیچ ئەنجامێک لەگەڵ پێوەری گەڕانەکەت ناگونجێت.",
@@ -400,7 +407,7 @@ function InstagramReelCard({
           }}
           onCanPlay={() => setIsLoaded(true)}
           onLoadedData={() => setIsLoaded(true)}
-          className="w-full h-full object-cover"
+          className="w-full h-full object-contain bg-black"
         />
       </div>
 
@@ -657,6 +664,66 @@ function InstagramReelCard({
 }
 
 export default function App() {
+  // Markdown & formatting helper for the Cinematic Creative Partner response
+  const renderFormattedResponse = (text: string) => {
+    return text.split("\n").map((line, i) => {
+      // Check for bullet points
+      if (line.trim().startsWith("* ") || line.trim().startsWith("- ")) {
+        return (
+          <li key={i} className="ml-4 list-disc text-gray-300 text-[11px] leading-relaxed my-0.5">
+            {line.trim().substring(2)}
+          </li>
+        );
+      }
+      // Check for headers (e.g. ### Header or **Header**)
+      if (line.startsWith("###")) {
+        return (
+          <h5 key={i} className="text-xs font-bold text-cyan-400 font-mono mt-2 mb-1">
+            {line.replace("###", "").trim()}
+          </h5>
+        );
+      }
+      if (line.startsWith("##")) {
+        return (
+          <h4 key={i} className="text-[11px] uppercase tracking-wider font-bold text-[#00f0ff] font-mono mt-3 mb-1.5">
+            {line.replace("##", "").trim()}
+          </h4>
+        );
+      }
+      // Handle inline bold markers like **text**
+      const parts = [];
+      let currentLine = line;
+      let boldIndex = currentLine.indexOf("**");
+      while (boldIndex !== -1) {
+        if (boldIndex > 0) {
+          parts.push(currentLine.substring(0, boldIndex));
+        }
+        const nextBold = currentLine.indexOf("**", boldIndex + 2);
+        if (nextBold !== -1) {
+          parts.push(
+            <strong key={boldIndex} className="text-white font-semibold">
+              {currentLine.substring(boldIndex + 2, nextBold)}
+            </strong>
+          );
+          currentLine = currentLine.substring(nextBold + 2);
+        } else {
+          parts.push(currentLine.substring(boldIndex));
+          currentLine = "";
+        }
+        boldIndex = currentLine.indexOf("**");
+      }
+      if (currentLine) {
+        parts.push(currentLine);
+      }
+
+      return (
+        <p key={i} className="text-[11px] text-gray-300 leading-relaxed my-1">
+          {parts.length > 0 ? parts : line}
+        </p>
+      );
+    });
+  };
+
   // First Launch state
   const [lang, setLang] = useState<Lang | null>(() => {
     return localStorage.getItem("krdhub_lang") as Lang | null;
@@ -665,6 +732,16 @@ export default function App() {
   const [isRegistered, setIsRegistered] = useState<boolean>(() => {
     return localStorage.getItem("krdhub_registered") === "true";
   });
+
+  const [onboardingStep, setOnboardingStep] = useState<1 | 2>(1);
+
+  const [authMethod, setAuthMethod] = useState<'google' | 'facebook' | 'apple' | 'gmail' | null>(() => {
+    return localStorage.getItem("krdhub_auth_method") as 'google' | 'facebook' | 'apple' | 'gmail' | null;
+  });
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [showGmailAuthForm, setShowGmailAuthForm] = useState(false);
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
 
   const [regPhoto, setRegPhoto] = useState<string>(() => {
     const stored = localStorage.getItem("krdhub_my_profile");
@@ -785,10 +862,114 @@ export default function App() {
     }
   };
 
+  const handleMockSignIn = (method: 'google' | 'facebook' | 'apple' | 'gmail', customEmail?: string) => {
+    setIsAuthenticating(true);
+    setAuthMethod(null);
+    if (method !== 'gmail') {
+      setShowGmailAuthForm(false);
+    }
+    
+    setTimeout(() => {
+      setIsAuthenticating(false);
+      setAuthMethod(method);
+      localStorage.setItem("krdhub_auth_method", method);
+      
+      // Look up if we have a saved profile for this specific provider
+      const savedProviderProfileStr = localStorage.getItem(`krdhub_profile_${method}`);
+      if (savedProviderProfileStr) {
+        try {
+          const parsed = JSON.parse(savedProviderProfileStr);
+          if (parsed) {
+            // Found existing user! Automatically restore profile and skip Step 2
+            setMyProfile(parsed);
+            
+            // Sync edit inputs
+            setEditName(parsed.name || "");
+            setEditRole(parsed.role || "");
+            setEditLocation(parsed.location || "");
+            setEditBio(parsed.bio || "");
+            setEditAvatarUrl(parsed.avatarUrl || "");
+            
+            // Set registration success inputs for sync
+            setRegName(parsed.name || "");
+            setRegPhoto(parsed.avatarUrl || "");
+            setRegWork(parsed.role || "");
+            setRegLocation(parsed.location || "");
+            setRegBio(parsed.bio || "");
+            setRegAge(parsed.age || "24");
+            setRegGender(parsed.gender || "male");
+
+            // Persist the active profile
+            localStorage.setItem("krdhub_my_profile", JSON.stringify(parsed));
+            localStorage.setItem("krdhub_registered", "true");
+            setIsRegistered(true);
+            
+            // Sync with backend mock if any
+            fetch("/api/creator/profile", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(parsed)
+            }).catch((err) => console.error("Auto login profile sync fail:", err));
+
+            showToast(
+              lang === "en" 
+                ? `Welcome back, ${parsed.name}! (via ${method.toUpperCase()})` 
+                : `بەخێربێیتەوە، ${parsed.name}! (لە ڕێگەی ${method.toUpperCase()})`
+            );
+            return;
+          }
+        } catch (e) {
+          console.error("Failed to parse saved provider-specific profile", e);
+        }
+      }
+
+      // If NO existing profile was found for this provider, we proceed to Step 2 ("Complete Profile Screen")
+      // Initialize some starting fields for the new profile depending on the social auth source
+      let sampleName = "";
+      let samplePhoto = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&fit=crop&q=80";
+
+      if (method === 'google') {
+        sampleName = "Dosty Karkuke";
+        samplePhoto = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&fit=crop&q=80";
+      } else if (method === 'apple') {
+        sampleName = "Apple Cinematic Director";
+        samplePhoto = "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&fit=crop&q=80";
+      } else if (method === 'facebook') {
+        sampleName = "Facebook Producer Studio";
+        samplePhoto = "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&fit=crop&q=80";
+      } else {
+        const emailAddress = customEmail || authEmail || "creator@gmail.com";
+        sampleName = emailAddress ? emailAddress.split("@")[0] : "Kurdish Indie Creator";
+        samplePhoto = "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&fit=crop&q=80";
+      }
+
+      setRegName(sampleName);
+      setRegPhoto(samplePhoto);
+      
+      // Transition to Step 2
+      setOnboardingStep(2);
+
+      showToast(
+        lang === "en" 
+          ? `Authenticated with ${method.toUpperCase()}. Let's set up your profile!` 
+          : `بە سەرکەوتوویی ناسنامەکرا لە ڕێگەی ${method.toUpperCase()}. با پڕۆفایلەکەت ڕێکبخەین!`
+      );
+    }, 1200);
+  };
+
   const handleSaveRegistration = (e: React.FormEvent) => {
     e.preventDefault();
     if (!regName.trim()) {
       showToast(lang === "en" ? "Please enter your name." : "تکایە ناوی خۆت بنووسە.");
+      return;
+    }
+
+    if (!authMethod) {
+      showToast(
+        lang === "en" 
+          ? "Please select a standard authentication method first." 
+          : "تکایە سەرەتا یەکێک لە ڕێگاکانی ناسنامەکردن دیاریبکە."
+      );
       return;
     }
 
@@ -813,7 +994,13 @@ export default function App() {
     setEditBio(updatedProfile.bio);
 
     // Save registration details to local storage
+    localStorage.setItem("krdhub_auth_method", authMethod);
     localStorage.setItem("krdhub_registered", "true");
+    
+    // Combined persistence (Global profile and Provider profile)
+    localStorage.setItem("krdhub_my_profile", JSON.stringify(updatedProfile));
+    localStorage.setItem(`krdhub_profile_${authMethod}`, JSON.stringify(updatedProfile));
+
     setIsRegistered(true);
 
     // Sync to back-end
@@ -878,6 +1065,7 @@ export default function App() {
 
   // Group chat configuration variables
   const [showGroupModal, setShowGroupModal] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [groupName, setGroupName] = useState("");
   const [selectedGroupMembers, setSelectedGroupMembers] = useState<string[]>([]);
 
@@ -970,6 +1158,8 @@ export default function App() {
   const [isMoodSearching, setIsMoodSearching] = useState(false);
   const [moodSearchResults, setMoodSearchResults] = useState<Movie[]>([]);
   const [moodSearchError, setMoodSearchError] = useState<string | null>(null);
+  const [aiPartnerResponse, setAiPartnerResponse] = useState<string | null>(null);
+  const [aiConversationContext, setAiConversationContext] = useState<{ id: string; role: 'user' | 'assistant'; text: string; timestamp: string }[]>([]);
 
   // Selection states
   const [selectedCreatorId, setSelectedCreatorId] = useState<string | null>(null);
@@ -1034,8 +1224,122 @@ export default function App() {
   useEffect(() => {
     if (myProfile) {
       localStorage.setItem("krdhub_my_profile", JSON.stringify(myProfile));
+      if (authMethod) {
+        localStorage.setItem(`krdhub_profile_${authMethod}`, JSON.stringify(myProfile));
+      }
     }
-  }, [myProfile]);
+  }, [myProfile, authMethod]);
+
+  // Follows state mapping to handle Followers / Following lists
+  const [modalUserList, setModalUserList] = useState<{ title: string; users: string[] } | null>(null);
+
+  const [followsMap, setFollowsMap] = useState<Record<string, { followers: string[]; following: string[] }>>(() => {
+    const stored = localStorage.getItem("krdhub_follows_map");
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (parsed && typeof parsed === "object") {
+          return parsed;
+        }
+      } catch (e) {
+        console.error("Failed to parse krdhub_follows_map", e);
+      }
+    }
+    // Pre-seeded defaults for a highly realistic platform experience
+    const loadedFollowing = (() => {
+      try {
+        return JSON.parse(localStorage.getItem("krdhub_following") || "[]");
+      } catch {
+        return [];
+      }
+    })();
+    return {
+      "me": {
+        followers: ["c-marcus", "c-zara"],
+        following: loadedFollowing
+      },
+      "c-marcus": {
+        followers: ["c-dara", "c-saman"],
+        following: ["c-zara", "me"]
+      },
+      "c-dara": {
+        followers: loadedFollowing.includes("c-dara") ? ["me"] : [],
+        following: ["c-marcus", "c-saman"]
+      },
+      "c-zara": {
+        followers: loadedFollowing.includes("c-zara") ? ["c-marcus", "me"] : ["c-marcus"],
+        following: ["me"]
+      },
+      "c-saman": {
+        followers: loadedFollowing.includes("c-saman") ? ["c-marcus", "c-dara", "me"] : ["c-marcus", "c-dara"],
+        following: ["c-marcus"]
+      }
+    };
+  });
+
+  // Persist followsMap to localStorage
+  useEffect(() => {
+    localStorage.setItem("krdhub_follows_map", JSON.stringify(followsMap));
+  }, [followsMap]);
+
+  // Synchronize followsMap whenever followingIds changes
+  useEffect(() => {
+    setFollowsMap(prev => {
+      const currentFollowingInMap = prev["me"]?.following || [];
+      const isSyncNeeded = 
+        currentFollowingInMap.length !== followingIds.length || 
+        !followingIds.every(id => currentFollowingInMap.includes(id));
+
+      if (!isSyncNeeded) return prev;
+
+      const nextMap = { ...prev };
+      nextMap["me"] = {
+        ...(nextMap["me"] || { followers: ["c-marcus", "c-zara"], following: [] }),
+        following: followingIds
+      };
+
+      Object.keys(nextMap).forEach(creatorId => {
+        if (creatorId === "me") return;
+        
+        const isFollowingThisCreator = followingIds.includes(creatorId);
+        const currentFollowers = nextMap[creatorId]?.followers || [];
+        const containsMe = currentFollowers.includes("me");
+
+        if (isFollowingThisCreator && !containsMe) {
+          nextMap[creatorId] = {
+            ...(nextMap[creatorId] || { followers: [], following: [] }),
+            followers: [...currentFollowers, "me"]
+          };
+        } else if (!isFollowingThisCreator && containsMe) {
+          nextMap[creatorId] = {
+            ...(nextMap[creatorId] || { followers: [], following: [] }),
+            followers: currentFollowers.filter(id => id !== "me")
+          };
+        }
+      });
+
+      return nextMap;
+    });
+  }, [followingIds]);
+
+  const toggleFollowCreator = (creatorId: string) => {
+    const isFollowing = followingIds.includes(creatorId);
+    if (isFollowing) {
+      setFollowingIds(prev => prev.filter(id => id !== creatorId));
+      showToast(lang === "en" ? `Unfollowed @${creatorId}` : `فۆڵۆوت لادا بۆ @${creatorId}`);
+    } else {
+      setFollowingIds(prev => [...prev, creatorId]);
+      showToast(lang === "en" ? `Following @${creatorId}!` : `فۆڵۆوت کرد @${creatorId}!`);
+    }
+  };
+
+  const getFollowersCount = (id: string) => {
+    return followsMap[id]?.followers?.length || 0;
+  };
+
+  const getFollowingCount = (id: string) => {
+    return followsMap[id]?.following?.length || 0;
+  };
 
   // Portfolio publication models
   const [newPortTitle, setNewPortTitle] = useState("");
@@ -1046,7 +1350,11 @@ export default function App() {
   const [showAddPortfolio, setShowAddPortfolio] = useState(false);
 
   // New Post publication models
+  const [worksSubTab, setWorksSubTab] = useState<"feed" | "portfolios">("feed");
+  const [newPostTags, setNewPostTags] = useState<string[]>([]);
+  const [newPostTagInput, setNewPostTagInput] = useState("");
   const [showAddPostModal, setShowAddPostModal] = useState(false);
+  const [isAIChatOpen, setIsAIChatOpen] = useState(false);
   const [newPostTitle, setNewPostTitle] = useState("");
   const [newPostDesc, setNewPostDesc] = useState("");
   const [newPostCategory, setNewPostCategory] = useState("Videographer");
@@ -1105,13 +1413,14 @@ export default function App() {
     const newPost: Movie = {
       id: "m_user_" + Date.now(),
       title: captionText,
-      year: "2026",
-      genre: myProfile.role || "Creator",
+      year: newPostYear.trim() || "2026",
+      genre: newPostCategory || myProfile.role || "Creator",
       description: newPostDesc.trim() || (lang === "en" ? "Creative artwork shared by verified artist." : "کاری هونەری هاوبەشکراو لەلایەن سینەماکار."),
       director: myProfile.name,
       rating: "9.8",
       backdropUrl: newPostPhoto,
       indie: true,
+      tags: newPostTags, // Pass tags to the movie object
       createdAt: Date.now() // Absolute current timestamp for relative date calculation
     };
 
@@ -1122,6 +1431,8 @@ export default function App() {
     setNewPostTitle("");
     setNewPostDesc("");
     setNewPostPhoto("");
+    setNewPostTags([]);
+    setNewPostTagInput("");
 
     showToast(lang === "en" ? "Post published to feed!" : "پۆستەکە بە سەرکەوتوویی بڵاوکرایەوە!");
   };
@@ -1286,15 +1597,40 @@ export default function App() {
     if (!prompt.trim()) return;
     setIsMoodSearching(true);
     setMoodSearchError(null);
+    
+    // Add user prompt to conversation history immediately
+    const userTimestamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const userMsg = {
+      id: `ai-msg-usr-${Date.now()}`,
+      role: "user" as const,
+      text: prompt,
+      timestamp: userTimestamp
+    };
+    
+    const updatedHistory = [...aiConversationContext, userMsg];
+    setAiConversationContext(updatedHistory);
+    setMoodSearchQuery(""); // clear input field for a fluid DM feel
+    
     try {
       const response = await fetch("/api/mood-search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify({ prompt, history: updatedHistory, lang }),
       });
       const data = await response.json();
       if (data.films) {
         setMoodSearchResults(data.films);
+        setAiPartnerResponse(data.partnerResponse || null);
+        
+        // Add assistant's response to history
+        const assistantTimestamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+        const assistantMsg = {
+          id: `ai-msg-ast-${Date.now()}`,
+          role: "assistant" as const,
+          text: data.partnerResponse || "Consultation draft generated.",
+          timestamp: assistantTimestamp
+        };
+        setAiConversationContext(prev => [...prev, assistantMsg]);
         showToast(data.isFallback ? currentT.recommenderHint : currentT.aiIndicator);
       } else {
         setMoodSearchError("Invalid search schema");
@@ -1722,7 +2058,7 @@ export default function App() {
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -50 }}
           transition={{ duration: 0.35, ease: "easeInOut" }}
-          className="w-full"
+          className="w-full animate-fade-in"
         >
           <div className="min-h-screen bg-[#020202] text-white flex flex-col items-center justify-center p-4 md:p-8 relative select-none antialiased overflow-y-auto" dir={isRtl ? "rtl" : "ltr"}>
             {/* Cinematic Backdrop blur */}
@@ -1734,6 +2070,7 @@ export default function App() {
             <div className="absolute top-6 right-6 z-20">
               <button
                 type="button"
+                id="locale-switch-onboarding"
                 onClick={() => handleSelectLanguage(lang === "en" ? "ckb" : "en")}
                 className="bg-[#0a0a0a]/95 hover:bg-cyan-950/50 border border-cyan-800/30 font-semibold py-1.5 px-4 rounded-full text-cyan-400 shadow-xl flex items-center gap-1.5 text-xs transition-all active:scale-95 cursor-pointer"
               >
@@ -1742,196 +2079,380 @@ export default function App() {
               </button>
             </div>
 
-            {/* Main Card */}
-            <div className="w-full max-w-lg bg-[#080808]/90 border border-gray-900 rounded-3xl p-6 md:p-8 space-y-6 relative z-10 shadow-2xl shadow-cyan-950/20 backdrop-blur-md my-8">
-              <div className="text-center space-y-2">
-                <div className="inline-flex p-3 bg-cyan-950/40 rounded-2xl border border-cyan-800/20 text-cyan-400 mb-1">
-                  <Sparkles className="w-6 h-6" />
-                </div>
-                <h1 className="text-2xl font-black tracking-wide text-white font-display">
-                  {currentT.regTitle}
-                </h1>
-                <p className="text-xs text-gray-400">
-                  {currentT.regSub}
-                </p>
-              </div>
-
-              <form onSubmit={handleSaveRegistration} className="space-y-5">
-                {/* Custom Photo Upload supporting drag and drop or manual select */}
+            {/* Step 1: Social Sign-In Screen */}
+            {onboardingStep === 1 ? (
+              <div id="onboarding-step-1-card" className="w-full max-w-md bg-[#080808]/90 border border-gray-900 rounded-3xl p-6 md:p-8 space-y-6 relative z-10 shadow-2xl shadow-cyan-950/20 backdrop-blur-md my-8 text-center animate-fade-in">
                 <div className="space-y-2">
-                  <label className="block text-xs font-mono font-bold tracking-wider text-cyan-400 uppercase">
-                    {currentT.regPhoto}
-                  </label>
+                  <div className="inline-flex p-3 bg-cyan-950/40 rounded-2xl border border-cyan-800/20 text-cyan-400 mb-1">
+                    <Sparkles className="w-6 h-6 animate-pulse" />
+                  </div>
+                  <h1 className="text-2xl font-black tracking-wide text-white font-display">
+                    {lang === "en" ? "Enter Krd Hub" : "چوونە ژوورەوەی Krd Hub"}
+                  </h1>
+                  <p className="text-xs text-gray-400 max-w-sm mx-auto">
+                    {lang === "en"
+                      ? "The cinematic creative platform for Kurdish filmmakers & portfolio builders."
+                      : "سەکۆی سینەمایی پێشکەوتوو بۆ مۆنتاژکاران و بەرهەمهێنەرانی کورد."}
+                  </p>
+                </div>
 
-                  <div className="flex flex-col sm:flex-row items-center gap-4">
-                    {/* Live Preview Circle */}
-                    <div className="relative shrink-0 w-20 h-20 rounded-full border border-cyan-500/30 overflow-hidden bg-gray-950 group">
-                      <img 
-                        src={regPhoto} 
-                        alt="Preview" 
-                        className="w-full h-full object-cover"
-                        onError={() => setRegPhoto("https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&fit=crop&q=80")}
-                      />
+                {/* Social Buttons Container */}
+                <div className="space-y-3.5 pt-2">
+                  {/* Google Button */}
+                  <button
+                    id="social-continue-google"
+                    type="button"
+                    onClick={() => handleMockSignIn('google')}
+                    disabled={isAuthenticating}
+                    className="w-full flex items-center justify-between py-3.5 px-5 bg-[#0f0f0f] hover:bg-[#141414] border border-gray-800 hover:border-gray-700 rounded-xl text-xs font-semibold text-gray-100 transition-all active:scale-98 cursor-pointer disabled:opacity-50"
+                  >
+                    <div className="flex items-center gap-3">
+                      {/* Google G logo stylized as vector */}
+                      <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                        <path d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.84z" fill="#FBBC05" />
+                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335" />
+                      </svg>
+                      <span className="font-sans tracking-wide">{lang === "en" ? "Continue with Google" : "بەردەوامبە لەگەڵ Google"}</span>
                     </div>
+                    <span className="text-[10px] text-gray-500 font-mono">GOOGLE.OAUTH</span>
+                  </button>
 
-                    {/* Drag-&-Drop Upload Area */}
-                    <div 
-                      onDragEnter={handleDrag}
-                      onDragOver={handleDrag}
-                      onDragLeave={handleDrag}
-                      onDrop={handleDrop}
-                      className={`flex-1 w-full p-4 border rounded-xl flex flex-col items-center justify-center text-center transition-all cursor-pointer ${
-                        dragActive 
-                          ? "border-cyan-400 bg-cyan-950/20" 
-                          : "border-gray-800 bg-[#0d0d0d] hover:border-cyan-800/50"
-                      }`}
-                      onClick={() => document.getElementById("profile-upload-file")?.click()}
-                    >
-                      <p className="text-xs text-cyan-400/80 font-medium">
-                        {lang === "en" ? "Drag & drop file here or click to browse" : "وێنەکە ڕابکێشە ئێرە یان کرتە بکە بۆ گەڕان"}
-                      </p>
-                      <p className="text-[10px] text-gray-500 mt-1">
-                        {lang === "en" ? "PNG, JPG up to 5MB" : "PNG, JPG تا ٥ مێگابایت"}
-                      </p>
-                      <input 
-                        id="profile-upload-file"
-                        type="file" 
-                        accept="image/*"
-                        onChange={handleFileInput}
-                        className="hidden" 
-                      />
+                  {/* Facebook Button */}
+                  <button
+                    id="social-continue-facebook"
+                    type="button"
+                    onClick={() => handleMockSignIn('facebook')}
+                    disabled={isAuthenticating}
+                    className="w-full flex items-center justify-between py-3.5 px-5 bg-[#0f0f0f] hover:bg-[#141414] border border-gray-800 hover:border-gray-700 rounded-xl text-xs font-semibold text-gray-100 transition-all active:scale-98 cursor-pointer disabled:opacity-50"
+                  >
+                    <div className="flex items-center gap-3">
+                      {/* Facebook Logo as official styled brand vector */}
+                      <svg className="w-4 h-4 shrink-0 text-[#1877F2]" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                      </svg>
+                      <span className="font-sans tracking-wide">{lang === "en" ? "Continue with Facebook" : "بەردەوامبە لەگەڵ Facebook"}</span>
                     </div>
+                    <span className="text-[10px] text-gray-500 font-mono">FB.SECURE</span>
+                  </button>
+
+                  {/* Apple Button */}
+                  <button
+                    id="social-continue-apple"
+                    type="button"
+                    onClick={() => handleMockSignIn('apple')}
+                    disabled={isAuthenticating}
+                    className="w-full flex items-center justify-between py-3.5 px-5 bg-[#0f0f0f] hover:bg-[#141414] border border-gray-800 hover:border-gray-700 rounded-xl text-xs font-semibold text-gray-100 transition-all active:scale-98 cursor-pointer disabled:opacity-50"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Apple className="w-4 h-4 text-white shrink-0" />
+                      <span className="font-sans tracking-wide">{lang === "en" ? "Continue with Apple" : "بەردەوامبە لەگەڵ Apple"}</span>
+                    </div>
+                    <span className="text-[10px] text-gray-500 font-mono">APPLE.ID</span>
+                  </button>
+
+                  <div className="relative py-2 flex items-center justify-center">
+                    <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                      <div className="w-full border-t border-gray-900"></div>
+                    </div>
+                    <span className="relative px-3 bg-[#080808] text-[10px] font-mono tracking-widest text-gray-600 uppercase">
+                      {lang === "en" ? "Alternate Method" : "ڕێگای جێگرەوە"}
+                    </span>
                   </div>
 
-                  {/* Photo Direct Link Input Box */}
-                  <div className="space-y-1.5 mt-2">
-                    <input 
-                      type="text"
-                      value={regPhoto}
-                      onChange={(e) => setRegPhoto(e.target.value)}
-                      placeholder={currentT.regPhotoPlaceholder}
-                      className="w-full bg-[#0a0a0a] border border-gray-800 rounded-lg py-1.5 px-3 text-xs text-gray-300 focus:outline-none focus:border-cyan-500 transition-colors"
-                    />
-                    <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
-                      <span className="text-[10px] text-gray-500 font-mono font-semibold">{lang === "en" ? "Quick Avatars:" : "وێنەی خێرا:"}</span>
-                      {[
-                        "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
-                        "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
-                        "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80",
-                        "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80"
-                      ].map((url, i) => (
+                  {/* Email/Password Button */}
+                  <button
+                    id="social-continue-email"
+                    type="button"
+                    onClick={() => setShowGmailAuthForm(!showGmailAuthForm)}
+                    className="w-full flex items-center justify-between py-3 px-5 bg-[#080808] hover:bg-[#0d0d0d] border border-gray-900 hover:border-gray-800 rounded-xl text-xs font-semibold text-gray-400 hover:text-white transition-all active:scale-98 cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Mail className="w-4 h-4 text-cyan-500 shrink-0" />
+                      <span className="font-sans tracking-wide">{lang === "en" ? "Continue with Email/Password" : "بەردەوامبە بە ایمێڵ و تێپەڕەوشە"}</span>
+                    </div>
+                    <span className="text-xs text-cyan-500">{showGmailAuthForm ? "▼" : "▶"}</span>
+                  </button>
+
+                  {/* Gmail Expandable Drawer Sub-form */}
+                  <AnimatePresence>
+                    {showGmailAuthForm && (
+                      <motion.div
+                        key="gmail-form"
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="overflow-hidden bg-[#0c0c0c]/80 rounded-2xl border border-gray-900/40 p-4.5 space-y-3 mt-1.5 text-left"
+                      >
+                        <div className="space-y-1">
+                          <label className="block text-[10px] font-mono text-cyan-400 uppercase tracking-widest font-bold">Email Address / ئیمێڵ</label>
+                          <input 
+                            type="email"
+                            value={authEmail}
+                            onChange={(e) => setAuthEmail(e.target.value)}
+                            placeholder="creator@krdhub.com"
+                            className="w-full bg-[#050505] border border-gray-800 rounded-lg p-2 text-xs focus:outline-none focus:border-cyan-500/80 text-white transition-colors"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="block text-[10px] font-mono text-cyan-400 uppercase tracking-widest font-bold">Secure Password / تێپەڕەوشە</label>
+                          <input 
+                            type="password"
+                            value={authPassword}
+                            onChange={(e) => setAuthPassword(e.target.value)}
+                            placeholder="••••••••"
+                            className="w-full bg-[#050505] border border-gray-800 rounded-lg p-2 text-xs focus:outline-none focus:border-cyan-500/80 text-white transition-colors"
+                          />
+                        </div>
                         <button
-                          key={i}
                           type="button"
-                          onClick={() => setRegPhoto(url)}
-                          className="w-6 h-6 rounded-full overflow-hidden border border-gray-900 hover:border-cyan-400 transition-all cursor-pointer shrink-0"
+                          id="submit-email-auth-btn"
+                          onClick={() => {
+                            if (!authEmail.includes("@")) {
+                              showToast(lang === "en" ? "Please enter a valid email address." : "تکایە ئیمێڵێکی دروست بنووسە.");
+                              return;
+                            }
+                            if (authPassword.length < 4) {
+                              showToast(lang === "en" ? "Password must exceed 4 characters." : "تێپەڕەوشە دەبێت لانی کەم ٤ پیت بێت.");
+                              return;
+                            }
+                            handleMockSignIn('gmail');
+                          }}
+                          className="w-full mt-1.5 py-2 px-4 rounded-lg bg-cyan-950 hover:bg-cyan-900 text-cyan-300 hover:text-white font-mono text-xs font-semibold cursor-pointer border border-cyan-800 transition-colors flex items-center justify-center gap-1.5"
                         >
-                          <img src={url} alt="" className="w-full h-full object-cover pointer-events-none" />
+                          <Mail className="w-3.5 h-3.5" />
+                          <span>{lang === "en" ? "Sign In & Initialize" : "چوونەژوورەوە و چالاککردن"}</span>
                         </button>
-                      ))}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Verification Spinner */}
+                  {isAuthenticating && (
+                    <div id="auth-loading-state" className="flex items-center gap-3 p-3 bg-cyan-950/20 border border-cyan-800/20 rounded-xl justify-center">
+                      <div className="w-4 h-4 border-2 border-cyan-400/20 border-t-cyan-400 rounded-full animate-spin shrink-0" />
+                      <span className="text-[10px] font-mono tracking-wider text-cyan-400 uppercase animate-pulse">
+                        {lang === "en" ? "Verifying signature token..." : "ناسنامەکردن و دەستبەکاربوونی مۆڵەت..."}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Nice footer message for the auth screen */}
+                <div className="pt-3 border-t border-gray-950 flex items-center justify-between text-[10px] text-gray-600 font-mono">
+                  <span>SSL SECURED PROTOCOL 256-BIT</span>
+                  <span>KRDHUB.NET</span>
+                </div>
+              </div>
+            ) : (
+              /* Step 2: Complete Profile Screen */
+              <div id="onboarding-step-2-card" className="w-full max-w-lg bg-[#080808]/90 border border-gray-900 rounded-3xl p-6 md:p-8 space-y-6 relative z-10 shadow-2xl shadow-cyan-950/20 backdrop-blur-md my-8">
+                {/* Back button and Header */}
+                <div className="flex items-start gap-4 pb-2 border-b border-gray-900/60">
+                  <button
+                    type="button"
+                    onClick={() => setOnboardingStep(1)}
+                    className="p-2 bg-gray-950 hover:bg-cyan-950/30 rounded-xl border border-gray-800 hover:border-cyan-800/40 text-cyan-400 transition-all cursor-pointer shrink-0"
+                    title={lang === "en" ? "Go back to Step 1" : "گەڕانەوە بۆ هەنگاوی ١"}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <div className="space-y-1 text-left">
+                    <h1 className="text-xl font-black text-white font-display">
+                      {currentT.regTitle}
+                    </h1>
+                    <p className="text-xs text-gray-400">
+                      {lang === "en" 
+                        ? `Customize your workspace profile under standard auth: ${authMethod?.toUpperCase()}`
+                        : `زانیارییەکانی دەلاقەی پڕۆفایلەکەت لە سیستم بنووسە: ${authMethod?.toUpperCase()}`}
+                    </p>
+                  </div>
+                </div>
+
+                <form onSubmit={handleSaveRegistration} className="space-y-5">
+                  {/* Photo picker container */}
+                  <div className="p-4 bg-black/40 rounded-2xl border border-gray-900/60 space-y-3.5">
+                    <div className="space-y-1 text-left">
+                      <label className="block text-xs font-mono font-bold tracking-wider text-cyan-400 uppercase">
+                        {currentT.regPhoto} <span className="text-red-500">*</span>
+                      </label>
+                      <p className="text-[10px] text-gray-500 leading-normal">
+                        {lang === "en" ? "Upload an elegant circular visual portrait representing your artistic style" : "پڕۆترێتێکی شایستە بۆ پڕۆفایلەکەت بنووسە یان لێرەدا دایبنێ"}
+                      </p>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row items-center gap-4 pt-1">
+                      {/* Live Image Circle Preview */}
+                      <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-cyan-500 shrink-0 bg-gray-950 shadow-md">
+                        <img 
+                          src={regPhoto} 
+                          alt="Preview" 
+                          className="w-full h-full object-cover"
+                          onError={() => setRegPhoto("https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&fit=crop&q=80")}
+                        />
+                      </div>
+
+                      {/* Drag-&-Drop Upload Area */}
+                      <div 
+                        onDragEnter={handleDrag}
+                        onDragOver={handleDrag}
+                        onDragLeave={handleDrag}
+                        onDrop={handleDrop}
+                        className={`flex-1 w-full p-4 border rounded-xl flex flex-col items-center justify-center text-center transition-all cursor-pointer ${
+                          dragActive 
+                            ? "border-cyan-400 bg-cyan-950/20" 
+                            : "border-gray-800 bg-[#0d0d0d] hover:border-cyan-800/50"
+                        }`}
+                        onClick={() => document.getElementById("profile-upload-file-onboarding")?.click()}
+                      >
+                        <p className="text-xs text-cyan-400/80 font-medium">
+                          {lang === "en" ? "Drag & drop file here or click to browse" : "وێنەکە ڕابکێشە ئێرە یان کرتە بکە بۆ گەڕان"}
+                        </p>
+                        <p className="text-[10px] text-gray-500 mt-1">
+                          {lang === "en" ? "PNG, JPG up to 5MB" : "PNG, JPG تا ٥ مێگابایت"}
+                        </p>
+                        <input 
+                          id="profile-upload-file-onboarding"
+                          type="file" 
+                          accept="image/*"
+                          onChange={handleFileInput}
+                          className="hidden" 
+                        />
+                      </div>
+                    </div>
+
+                    {/* Photo Direct Link Input Box */}
+                    <div className="space-y-1.5 mt-2 text-left">
+                      <input 
+                        type="text"
+                        value={regPhoto}
+                        onChange={(e) => setRegPhoto(e.target.value)}
+                        placeholder={currentT.regPhotoPlaceholder}
+                        className="w-full bg-[#0a0a0a] border border-gray-800 rounded-lg py-1.5 px-3 text-xs text-gray-300 focus:outline-none focus:border-cyan-500 transition-colors"
+                      />
+                      <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                        <span className="text-[10px] text-gray-500 font-mono font-semibold">{lang === "en" ? "Quick Avatars:" : "وێنەی خێرا:"}</span>
+                        {[
+                          "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+                          "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
+                          "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80",
+                          "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80"
+                        ].map((url, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => setRegPhoto(url)}
+                            className="w-6 h-6 rounded-full overflow-hidden border border-gray-900 hover:border-cyan-400 transition-all cursor-pointer shrink-0"
+                          >
+                            <img src={url} alt="" className="w-full h-full object-cover pointer-events-none" />
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Grid Layout for Fields */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Full Name Input */}
+                  {/* Grid Layout for Fields */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Full Name Input */}
+                    <div className="space-y-1.5 text-left">
+                      <label className="block text-xs font-mono font-bold tracking-wider text-cyan-400 uppercase">
+                        {currentT.regName} <span className="text-red-500">*</span>
+                      </label>
+                      <input 
+                        type="text"
+                        required
+                        value={regName}
+                        onChange={(e) => setRegName(e.target.value)}
+                        placeholder={currentT.regNamePlaceholder}
+                        className="w-full bg-[#0c0c0c] hover:border-gray-800 border border-gray-900 rounded-xl py-2.5 px-4 text-sm text-gray-100 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20 transition-all"
+                      />
+                    </div>
+
+                    {/* Age Input */}
+                    <div className="space-y-1.5 text-left">
+                      <label className="block text-xs font-mono font-bold tracking-wider text-cyan-400 uppercase">
+                        {currentT.regAge}
+                      </label>
+                      <input 
+                        type="number"
+                        value={regAge}
+                        onChange={(e) => setRegAge(e.target.value)}
+                        placeholder={currentT.regAgePlaceholder}
+                        className="w-full bg-[#0c0c0c] hover:border-gray-800 border border-gray-900 rounded-xl py-2.5 px-4 text-sm text-gray-100 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20 transition-all"
+                      />
+                    </div>
+
+                    {/* Gender Selection */}
+                    <div className="space-y-1.5 text-left">
+                      <label className="block text-xs font-mono font-bold tracking-wider text-cyan-400 uppercase">
+                        {currentT.regGender}
+                      </label>
+                      <select
+                        value={regGender}
+                        onChange={(e) => setRegGender(e.target.value)}
+                        className="w-full bg-[#0c0c0c] hover:border-gray-800 border border-gray-900 rounded-xl py-2.5 px-4 text-sm text-gray-100 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20 transition-all cursor-pointer"
+                      >
+                        <option value="male">{currentT.regGenderMale}</option>
+                        <option value="female">{currentT.regGenderFemale}</option>
+                      </select>
+                    </div>
+
+                    {/* Location Input */}
+                    <div className="space-y-1.5 text-left">
+                      <label className="block text-xs font-mono font-bold tracking-wider text-cyan-400 uppercase">
+                        {currentT.regLocation}
+                      </label>
+                      <input 
+                        type="text"
+                        value={regLocation}
+                        onChange={(e) => setRegLocation(e.target.value)}
+                        placeholder={currentT.regLocationPlaceholder}
+                        className="w-full bg-[#0c0c0c] hover:border-gray-800 border border-gray-900 rounded-xl py-2.5 px-4 text-sm text-gray-100 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20 transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Work / Role Input */}
                   <div className="space-y-1.5 text-left">
                     <label className="block text-xs font-mono font-bold tracking-wider text-cyan-400 uppercase">
-                      {currentT.regName} <span className="text-red-500">*</span>
+                      {currentT.regWork}
                     </label>
                     <input 
                       type="text"
-                      required
-                      value={regName}
-                      onChange={(e) => setRegName(e.target.value)}
-                      placeholder={currentT.regNamePlaceholder}
-                      className="w-full bg-[#0c0c0c] hover:border-gray-800 border border-gray-900 rounded-xl py-2.5 px-4 text-sm text-gray-100 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20 transition-all"
+                      value={regWork}
+                      onChange={(e) => setRegWork(e.target.value)}
+                      placeholder={currentT.regWorkPlaceholder}
+                      className="w-full bg-[#0c0c0c] hover:border-gray-800 border border-gray-900 rounded-xl py-2.5 px-4 text-xs md:text-sm text-gray-100 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20 transition-all"
                     />
                   </div>
 
-                  {/* Age Input */}
+                  {/* Bio / Description */}
                   <div className="space-y-1.5 text-left">
                     <label className="block text-xs font-mono font-bold tracking-wider text-cyan-400 uppercase">
-                      {currentT.regAge}
+                      {currentT.regBio}
                     </label>
-                    <input 
-                      type="number"
-                      value={regAge}
-                      onChange={(e) => setRegAge(e.target.value)}
-                      placeholder={currentT.regAgePlaceholder}
-                      className="w-full bg-[#0c0c0c] hover:border-gray-800 border border-gray-900 rounded-xl py-2.5 px-4 text-sm text-gray-100 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20 transition-all"
+                    <textarea 
+                      rows={3}
+                      value={regBio}
+                      onChange={(e) => setRegBio(e.target.value)}
+                      placeholder={currentT.regBioPlaceholder}
+                      className="w-full bg-[#0c0c0c] hover:border-gray-800 border border-gray-900 rounded-xl py-2.5 px-4 text-xs md:text-sm text-gray-100 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20 transition-all resize-none"
                     />
                   </div>
 
-                  {/* Gender Selection */}
-                  <div className="space-y-1.5 text-left">
-                    <label className="block text-xs font-mono font-bold tracking-wider text-cyan-400 uppercase">
-                      {currentT.regGender}
-                    </label>
-                    <select
-                      value={regGender}
-                      onChange={(e) => setRegGender(e.target.value)}
-                      className="w-full bg-[#0c0c0c] hover:border-gray-800 border border-gray-900 rounded-xl py-2.5 px-4 text-sm text-gray-100 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20 transition-all cursor-pointer"
-                    >
-                      <option value="male">{currentT.regGenderMale}</option>
-                      <option value="female">{currentT.regGenderFemale}</option>
-                    </select>
-                  </div>
-
-                  {/* Location Input */}
-                  <div className="space-y-1.5 text-left">
-                    <label className="block text-xs font-mono font-bold tracking-wider text-cyan-400 uppercase">
-                      {currentT.regLocation}
-                    </label>
-                    <input 
-                      type="text"
-                      value={regLocation}
-                      onChange={(e) => setRegLocation(e.target.value)}
-                      placeholder={currentT.regLocationPlaceholder}
-                      className="w-full bg-[#0c0c0c] hover:border-gray-800 border border-gray-900 rounded-xl py-2.5 px-4 text-sm text-gray-100 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20 transition-all"
-                    />
-                  </div>
-                </div>
-
-                {/* Work / Role Input */}
-                <div className="space-y-1.5 text-left">
-                  <label className="block text-xs font-mono font-bold tracking-wider text-cyan-400 uppercase">
-                    {currentT.regWork}
-                  </label>
-                  <input 
-                    type="text"
-                    value={regWork}
-                    onChange={(e) => setRegWork(e.target.value)}
-                    placeholder={currentT.regWorkPlaceholder}
-                    className="w-full bg-[#0c0c0c] hover:border-gray-800 border border-gray-900 rounded-xl py-2.5 px-4 text-xs md:text-sm text-gray-100 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20 transition-all"
-                  />
-                </div>
-
-                {/* Bio / Description */}
-                <div className="space-y-1.5 text-left">
-                  <label className="block text-xs font-mono font-bold tracking-wider text-cyan-400 uppercase">
-                    {currentT.regBio}
-                  </label>
-                  <textarea 
-                    rows={3}
-                    value={regBio}
-                    onChange={(e) => setRegBio(e.target.value)}
-                    placeholder={currentT.regBioPlaceholder}
-                    className="w-full bg-[#0c0c0c] hover:border-gray-800 border border-gray-900 rounded-xl py-2.5 px-4 text-xs md:text-sm text-gray-100 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20 transition-all resize-none"
-                  />
-                </div>
-
-                {/* Submit / Proceed Button */}
-                <button
-                  type="submit"
-                  className="w-full bg-cyan-950 text-cyan-400 border border-cyan-500/40 hover:bg-cyan-900/60 font-bold py-3.5 px-6 rounded-2xl shadow-lg hover:shadow-cyan-500/10 cursor-pointer active:scale-98 transition-all duration-150 flex items-center justify-center gap-2 mt-2"
-                >
-                  <Sparkles className="w-5 h-5" />
-                  <span>{currentT.regSave}</span>
-                </button>
-              </form>
-            </div>
+                  {/* Submit / Proceed Button */}
+                  <button
+                    type="submit"
+                    id="submit-register-onboarding-btn"
+                    className="w-full bg-cyan-950 text-cyan-400 border border-cyan-500/40 hover:bg-cyan-900/60 font-bold py-3.5 px-6 rounded-2xl shadow-lg hover:shadow-cyan-500/10 cursor-pointer active:scale-98 transition-all duration-150 flex items-center justify-center gap-2 mt-2"
+                  >
+                    <Sparkles className="w-5 h-5" />
+                    <span>{currentT.regSave}</span>
+                  </button>
+                </form>
+              </div>
+            )}
           </div>
         </motion.div>
       ) : (
@@ -2049,7 +2570,9 @@ export default function App() {
           )}
 
           {/* Main viewport */}
-          <div className={`flex-1 overflow-y-auto no-scrollbar relative bg-[#030303] flex flex-col ${(activeTab === "chat" && activeConvId !== null) ? "pb-0" : "pb-24"}`}>
+          <div className={`flex-1 relative bg-[#030303] flex flex-col ${
+            (activeTab === "chat" || activeTab === "videos") ? "overflow-hidden h-full" : "overflow-y-auto no-scrollbar"
+          } ${(activeTab === "chat" && activeConvId !== null) ? "pb-0" : "pb-24"}`}>
             {/* LIGHTBOX PREVIEW */}
             {activeLightboxImage && (
               <div 
@@ -2107,25 +2630,26 @@ export default function App() {
                         <ChevronLeft className="w-5 h-5" />
                       </button>
 
-                      <div className="absolute bottom-4 left-4 right-4 flex items-end gap-4">
-                        <div className="relative">
+                      {/* Redesigned Centered Circular Avatar and details over cover photo */}
+                      <div className="absolute inset-0 flex flex-col items-center justify-center pt-8 px-4 text-center">
+                        <div className="relative mb-2 shrink-0">
                           <img 
                             src={targetCreator.avatarUrl} 
-                            className="w-20 h-20 rounded-xl object-cover border-2 border-cyan-400 bg-black"
+                            className="w-24 h-24 rounded-full object-cover border-2 border-cyan-400 bg-black shadow-[0_0_15px_rgba(6,182,212,0.3)]"
                             alt={targetCreator.name}
                           />
                           <span className="absolute -bottom-1 -right-1 bg-cyan-400 text-black text-[10px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-0.5">
                             <Star className="w-3 h-3 fill-black text-black inline" /> {targetCreator.rating}
                           </span>
                         </div>
-                        <div className="flex-1 min-w-0 text-left">
-                          <span className="text-[10px] uppercase tracking-widest text-cyan-400 font-mono font-bold bg-cyan-950/75 px-2 py-0.5 rounded-md border border-cyan-500/30">
+                        <div className="min-w-0 max-w-full">
+                          <span className="text-[9px] uppercase tracking-widest text-cyan-400 font-mono font-bold bg-cyan-950/75 px-2.5 py-1 rounded-md border border-cyan-500/30">
                             {targetCreator.role}
                           </span>
-                          <h1 className="text-xl font-bold font-display text-white mt-1.5 truncate">
+                          <h1 className="text-lg font-semibold font-display text-white mt-1.5 truncate max-w-xs sm:max-w-md">
                             {targetCreator.name}
                           </h1>
-                          <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
+                          <p className="text-xs text-gray-400 flex items-center justify-center gap-1 mt-1 leading-none">
                             <MapPin className="w-3.5 h-3.5 text-cyan-400/80 shrink-0" />
                             {targetCreator.location}
                           </p>
@@ -2158,6 +2682,47 @@ export default function App() {
                         <p className="text-sm text-gray-300 leading-relaxed bg-[#0a0a0a] p-3 rounded-lg border border-gray-900 text-left">
                           {targetCreator.bio}
                         </p>
+                      </div>
+
+                      {/* Followers and Following Clickable Stats Counters for target creator */}
+                      <div id="creator-profile-stats" className="grid grid-cols-2 gap-3">
+                        <button
+                          id="creator-followers-trigger"
+                          type="button"
+                          onClick={() => {
+                            setModalUserList({
+                              title: lang === "en" ? `${targetCreator.name}'s Followers` : `فۆڵۆوەرەکانی ${targetCreator.name}`,
+                              users: followsMap[targetCreator.id]?.followers || []
+                            });
+                          }}
+                          className="bg-black/60 hover:bg-cyan-950/20 border border-gray-900 hover:border-cyan-500/30 rounded-xl p-3 flex flex-col items-center justify-center transition-all cursor-pointer group active:scale-98 text-center"
+                        >
+                          <span className="text-md font-bold font-mono text-cyan-400 group-hover:scale-105 transition-transform">
+                            {getFollowersCount(targetCreator.id)}
+                          </span>
+                          <span className="text-[10px] font-mono uppercase tracking-wider text-gray-500 group-hover:text-cyan-300 transition-colors">
+                            {lang === "en" ? "Followers" : "فۆڵۆوەران"}
+                          </span>
+                        </button>
+
+                        <button
+                          id="creator-following-trigger"
+                          type="button"
+                          onClick={() => {
+                            setModalUserList({
+                              title: lang === "en" ? `${targetCreator.name} is Following` : `فۆڵۆوکراوەکانی ${targetCreator.name}`,
+                              users: followsMap[targetCreator.id]?.following || []
+                            });
+                          }}
+                          className="bg-black/60 hover:bg-cyan-950/20 border border-gray-900 hover:border-cyan-500/30 rounded-xl p-3 flex flex-col items-center justify-center transition-all cursor-pointer group active:scale-98 text-center"
+                        >
+                          <span className="text-md font-bold font-mono text-cyan-400 group-hover:scale-105 transition-transform">
+                            {getFollowingCount(targetCreator.id)}
+                          </span>
+                          <span className="text-[10px] font-mono uppercase tracking-wider text-gray-500 group-hover:text-cyan-300 transition-colors">
+                            {lang === "en" ? "Following" : "فۆڵۆوکراو"}
+                          </span>
+                        </button>
                       </div>
 
                       <div>
@@ -2208,11 +2773,33 @@ export default function App() {
                       </div>
                     </div>
 
-                    <div className="p-4 pt-2">
+                    <div className="p-4 pt-2 grid grid-cols-2 gap-3">
+                      <button 
+                        id="follow-creator-btn"
+                        onClick={() => toggleFollowCreator(targetCreator.id)}
+                        className={`py-3 rounded-lg font-bold font-display uppercase tracking-wider text-xs flex items-center justify-center gap-2 transition-all cursor-pointer hover:scale-[1.01] active:scale-95 ${
+                          followingIds.includes(targetCreator.id)
+                            ? "bg-gray-900 text-gray-400 border-2 border-gray-800"
+                            : "bg-cyan-950 hover:bg-cyan-900 text-cyan-400 border-2 border-cyan-400 shadow-lg shadow-cyan-950/50"
+                        }`}
+                      >
+                        {followingIds.includes(targetCreator.id) ? (
+                          <>
+                            <UserCheck className="w-4 h-4 text-gray-400" />
+                            {lang === "en" ? "Following" : "فۆڵۆوکراوە"}
+                          </>
+                        ) : (
+                          <>
+                            <UserPlus className="w-4 h-4 text-cyan-400" />
+                            {lang === "en" ? "Follow" : "فۆڵۆو بکە"}
+                          </>
+                        )}
+                      </button>
+
                       <button 
                         id="profile-dm-primary-btn"
                         onClick={() => handleStartDM(targetCreator)}
-                        className="w-full bg-cyan-950 hover:bg-cyan-900 text-cyan-400 border-2 border-cyan-400 py-3 rounded-lg font-bold font-display uppercase tracking-wider text-xs flex items-center justify-center gap-2 shadow-lg shadow-cyan-950/50 transition-all cursor-pointer hover:scale-[1.01] active:scale-95"
+                        className="bg-cyan-950 hover:bg-cyan-900 text-cyan-400 border-2 border-cyan-400 py-3 rounded-lg font-bold font-display uppercase tracking-wider text-xs flex items-center justify-center gap-2 shadow-lg shadow-cyan-950/50 transition-all cursor-pointer hover:scale-[1.01] active:scale-95 text-center"
                       >
                         <MessageSquare className="w-4 h-4 fill-cyan-400" />
                         {currentT.dmFooterAction} {targetCreator.name.split(" ")[0]}
@@ -2234,167 +2821,79 @@ export default function App() {
                 {/* TAB BINER */}
                 {activeTab === "biner" && (
                   <div className="p-4 space-y-6 flex-1 flex flex-col text-left">
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <h2 className="text-xs uppercase font-mono tracking-widest text-cyan-400 font-bold">{currentT.featuredRelease}</h2>
-                        <span className="text-[10px] text-gray-500 font-mono font-semibold">{currentT.trendingGlobal}</span>
-                      </div>
-                      
-                      <div className="relative rounded-2xl overflow-hidden border border-gray-900 group aspect-[2.1/1] bg-slate-950">
-                        <img 
-                          src="https://images.unsplash.com/photo-1542838132-92c53300491e?w=1000&auto=format&fit=crop&q=80" 
-                          className="w-full h-full object-cover brightness-[0.4] group-hover:scale-105 transition-all duration-500" 
-                          alt="Dune banner"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-[#030303] via-transparent to-black/30" />
-                        <div className="absolute inset-x-4 bottom-4 space-y-1">
-                          <span className="bg-cyan-500 text-black font-extrabold text-[8px] uppercase tracking-widest px-1.5 py-0.5 rounded">
-                            CHROMA NOIR
-                          </span>
-                          <h3 className="text-sm font-bold font-display text-white">Curator's Top Indie Selection</h3>
-                          <p className="text-[10px] text-gray-300 line-clamp-1">Explore moody rain-slicked visual assets and cybernetic landscapes.</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* AI Mood search panel */}
-                    <div className="bg-[#070707] rounded-2xl p-4 border border-[#111111] space-y-3.5 shadow-md relative">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5">
-                          <Sparkles className="w-4 h-4 text-cyan-400 animate-pulse shrink-0" />
-                          <h2 className="text-xs uppercase font-mono tracking-widest text-[#00f0ff] font-bold">
-                            {currentT.moodSearchTitle}
-                          </h2>
-                        </div>
-                      </div>
-
-                      <p className="text-[11px] text-gray-400 leading-relaxed">
-                        {currentT.moodSearchSub}
-                      </p>
-
-                      <div className="flex items-center gap-1 bg-black/60 rounded-xl p-1.5 border border-gray-900 focus-within:border-cyan-400/50">
-                        <input 
-                          id="mood-search-input"
-                          type="text" 
-                          placeholder={currentT.moodInputPlaceholder}
-                          value={moodSearchQuery}
-                          onChange={(e) => setMoodSearchQuery(e.target.value)}
-                          onKeyDown={(e) => e.key === "Enter" && handleMoodSearch(moodSearchQuery)}
-                          className="flex-1 bg-transparent text-xs text-white px-2 focus:outline-none placeholder-gray-600"
-                        />
-                        <button 
-                          id="submit-mood-search"
-                          onClick={() => handleMoodSearch(moodSearchQuery)}
-                          disabled={isMoodSearching}
-                          className="bg-cyan-950 hover:bg-cyan-900 text-cyan-400 p-2 rounded-lg border border-cyan-400/30 transition-transform disabled:opacity-50 cursor-pointer shrink-0"
-                        >
-                          <Search className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-
-                      <div className="flex flex-wrap gap-1.5 pt-1">
-                        <span className="text-[9px] font-mono text-gray-500">{currentT.quickPrompts}:</span>
-                        {[
-                          "dark suspense thriller",
-                          "neon cyberpunk noir",
-                          "Nordic ambient foley"
-                        ].map((suggestion) => (
-                          <button
-                            key={suggestion}
-                            onClick={() => {
-                              setMoodSearchQuery(suggestion);
-                              handleMoodSearch(suggestion);
-                            }}
-                            className="text-[9px] font-mono text-gray-400 bg-black hover:text-cyan-400 hover:border-cyan-400/35 border border-gray-900 rounded-md px-1.5 py-0.5 cursor-pointer"
-                          >
-                            #{suggestion}
-                          </button>
-                        ))}
-                      </div>
-
-                      {isMoodSearching && (
-                        <div id="ai-loading-state" className="py-8 bg-black/40 rounded-xl border border-gray-900/50 flex flex-col items-center justify-center space-y-3.5 text-center">
-                          <div className="relative w-12 h-12 flex items-center justify-center">
-                            <div className="absolute inset-0 rounded-full border-2 border-cyan-400/20 border-t-cyan-400 animate-spin" />
-                            <Sparkles className="w-5 h-5 text-cyan-400 animate-pulse" />
-                          </div>
-                          <div className="space-y-1 px-4">
-                            <p className="text-xs text-cyan-400 font-mono tracking-widest uppercase animate-pulse">{currentT.runningRecommender}</p>
-                            <p className="text-[10px] text-gray-500">{currentT.recommenderSub}</p>
-                          </div>
-                        </div>
-                      )}
-
-                      {moodSearchError && (
-                        <p className="text-[11px] text-red-400 bg-red-950/20 border border-red-900 p-2 rounded-lg">
-                          {moodSearchError}
+                    {/* Header Row with Title & AI Sparkle Button */}
+                    <div className="flex items-center justify-between pb-1 border-b border-gray-900/40">
+                      <div className="text-left">
+                        <h2 className="text-sm font-bold font-mono uppercase tracking-widest text-cyan-400">
+                          {currentT.navBiner}
+                        </h2>
+                        <p className="text-[10px] text-gray-500 font-mono">
+                          {lang === "en" ? "Explore works & portfolios" : "نمایشکردنی کار و پۆرتفۆلیۆکان"}
                         </p>
-                      )}
+                      </div>
 
-                      {moodSearchResults.length > 0 && (
-                        <div id="mood-results-box" className="space-y-4 pt-2 border-t border-gray-900/40">
+                      {/* AI Sparkle Button */}
+                      <button
+                        id="open-ai-chat"
+                        onClick={() => setIsAIChatOpen(true)}
+                        className="flex flex-col items-center justify-center p-1.5 rounded-xl bg-cyan-950/20 hover:bg-cyan-950/40 border border-cyan-800/40 hover:border-cyan-400/50 shadow-[0_0_15px_rgba(6,182,212,0.1)] hover:scale-[1.04] transition-all cursor-pointer w-11 h-11 shrink-0 group"
+                        title={lang === "en" ? "AI Cinema Partner" : "هاوبەشی سینەمایی بگری"}
+                      >
+                        <Sparkles className="w-4 h-4 text-cyan-400 group-hover:scale-110 transition-transform shrink-0" />
+                        <span className="text-[8.5px] font-mono font-bold text-cyan-400 mt-1 leading-none uppercase tracking-wider">AI</span>
+                      </button>
+                    </div>
+
+                    {/* Unified Selector: Cinema Feed vs Community Portfolios */}
+                    <div className="grid grid-cols-2 p-1 bg-black/80 rounded-xl border border-gray-900 shrink-0">
+                      <button
+                        onClick={() => setWorksSubTab("feed")}
+                        className={`py-2 text-[10px] uppercase font-mono font-bold tracking-wider rounded-lg transition-all cursor-pointer text-center ${
+                          worksSubTab === "feed"
+                            ? "bg-cyan-950/80 text-cyan-400 border border-cyan-800/40 shadow-sm"
+                            : "text-gray-500 hover:text-gray-300"
+                        }`}
+                      >
+                        🎥 {lang === "en" ? "Cinema Feed" : "فیدی بەرهەمەکان"}
+                      </button>
+                      <button
+                        onClick={() => setWorksSubTab("portfolios")}
+                        className={`py-2 text-[10px] uppercase font-mono font-bold tracking-wider rounded-lg transition-all cursor-pointer text-center ${
+                          worksSubTab === "portfolios"
+                            ? "bg-cyan-950/80 text-cyan-400 border border-cyan-800/40 shadow-sm"
+                            : "text-gray-500 hover:text-gray-300"
+                        }`}
+                      >
+                        📂 {lang === "en" ? "Crew Portfolios" : "پۆرتفۆلیۆی ستاف"}
+                      </button>
+                    </div>
+
+                    {worksSubTab === "feed" ? (
+                      <>
+                        <div className="space-y-2">
                           <div className="flex items-center justify-between">
-                            <span className="text-[10px] uppercase tracking-widest font-mono text-cyan-400 font-bold">{currentT.whyMatchesHeader}</span>
-                            <button 
-                              onClick={() => setMoodSearchResults([])}
-                              className="text-[10px] font-mono text-gray-500 hover:text-gray-300 cursor-pointer"
-                            >
-                              {currentT.cancel}
-                            </button>
+                            <h2 className="text-xs uppercase font-mono tracking-widest text-cyan-400 font-bold">{currentT.featuredRelease}</h2>
+                            <span className="text-[10px] text-gray-500 font-mono font-semibold">{currentT.trendingGlobal}</span>
                           </div>
-
-                          <div className="space-y-3 max-h-72 overflow-y-auto pr-1 no-scrollbar">
-                            {moodSearchResults.map((movie, index) => (
-                              <div key={index} className="bg-black/80 border border-[#1a1a1a] p-3 rounded-xl space-y-2">
-                                <div className="flex items-start justify-between gap-2">
-                                  <div>
-                                    <span className="text-[8px] bg-cyan-950 border border-cyan-800 text-cyan-400 px-1 py-0.2 rounded uppercase font-mono font-bold mr-1.5">
-                                      {movie.indie ? currentT.indie : currentT.globalPro}
-                                    </span>
-                                    <h4 className="text-xs font-bold text-white inline-block">
-                                      {movie.title} ({movie.year})
-                                    </h4>
-                                  </div>
-                                  <span className="text-[10px] font-mono text-gray-400">⭐ {movie.rating}</span>
-                                </div>
-
-                                <p className="text-[11px] text-gray-400 leading-relaxed italic">
-                                  {movie.description}
-                                </p>
-
-                                {movie.matchReason && (
-                                  <div className="bg-cyan-950/25 border-l-2 border-cyan-400 px-2 py-1 space-y-0.5 rounded-r">
-                                    <p className="text-[9px] uppercase font-mono tracking-widest text-cyan-400 font-bold">{currentT.whyMatchesHeader}</p>
-                                    <p className="text-[10px] text-gray-300 leading-normal">{movie.matchReason}</p>
-                                  </div>
-                                )}
-
-                                {movie.roleOpportunities && movie.roleOpportunities.length > 0 && (
-                                  <div className="pt-2 border-t border-gray-900/60 flex flex-wrap gap-1 items-center">
-                                    <span className="text-[9px] font-mono text-gray-500 mr-1 flex items-center gap-0.5">
-                                      <Briefcase className="w-2.5 h-2.5" /> {currentT.opportunityHeader}:
-                                    </span>
-                                    {movie.roleOpportunities.map((roleOpt) => (
-                                      <button
-                                        key={roleOpt}
-                                        onClick={() => {
-                                          setActiveTab("sako");
-                                          setGlobalSearchQuery(roleOpt);
-                                          showToast(`Filtering crew collaborators for '${roleOpt}'`);
-                                        }}
-                                        className="text-[9px] font-mono text-cyan-400 hover:text-white bg-cyan-950/40 border border-cyan-900/50 rounded-md px-1.5 py-0.5 transition-colors cursor-pointer"
-                                      >
-                                        {roleOpt}
-                                      </button>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            ))}
+                          
+                          <div className="relative rounded-2xl overflow-hidden border border-gray-900 group aspect-[2.1/1] bg-slate-950">
+                            <img 
+                              src="https://images.unsplash.com/photo-1542838132-92c53300491e?w=1000&auto=format&fit=crop&q=80" 
+                              className="w-full h-full object-cover brightness-[0.4] group-hover:scale-105 transition-all duration-500" 
+                              alt="Dune banner"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-[#030303] via-transparent to-black/30" />
+                            <div className="absolute inset-x-4 bottom-4 space-y-1">
+                              <span className="bg-cyan-500 text-black font-extrabold text-[8px] uppercase tracking-widest px-1.5 py-0.5 rounded">
+                                CHROMA NOIR
+                              </span>
+                              <h3 className="text-sm font-bold font-display text-white">Curator's Top Indie Selection</h3>
+                              <p className="text-[10px] text-gray-300 line-clamp-1">Explore moody rain-slicked visual assets and cybernetic landscapes.</p>
+                            </div>
                           </div>
                         </div>
-                      )}
-                    </div>
+
+                        {/* Inline AI panel relocated to floating top-corner Chat Overlay/Modal */}
 
                     {/* Directory search segment */}
                     <div className="space-y-3.5">
@@ -2505,6 +3004,17 @@ export default function App() {
                                   <h4 className="text-xs font-bold text-white mt-1 leading-tight truncate">{movie.title}</h4>
                                   <p className="text-[10px] text-gray-400 line-clamp-2 leading-relaxed">{movie.description}</p>
                                   
+                                  {/* Tags displaying inside feed card */}
+                                  {movie.tags && movie.tags.length > 0 && (
+                                    <div className="flex flex-wrap gap-1 mt-1 font-mono">
+                                      {movie.tags.map((tag) => (
+                                        <span key={tag} className="text-[8.5px] text-[#00f0ff] bg-cyan-950/20 px-1 rounded">
+                                          #{tag}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+
                                   <div className="flex items-center gap-1.5 pt-1.5 border-t border-gray-950 mt-1">
                                     <span className="text-[8.5px] text-gray-500 font-mono font-medium">
                                       🕒 {getRelativeTime(movie.createdAt, lang)}
@@ -2525,6 +3035,138 @@ export default function App() {
                         </div>
                       )}
                     </div>
+                      </>
+                    ) : (
+                      /* PORTFOLIOS SUB-TAB: The community portfolio items grid */
+                      <div className="space-y-4">
+                        <div className="space-y-1">
+                          <h2 className="text-xs uppercase font-mono tracking-widest text-[#00f0ff] font-bold">
+                            {lang === "en" ? "Unified Portfolios Showcase" : "نشینگەی پۆرتفۆلیۆی گشتی"}
+                          </h2>
+                          <p className="text-[10px] text-gray-500 leading-normal">
+                            {lang === "en" 
+                              ? "Browse high-precision masterworks uploaded by verified workspace creators." 
+                              : "سەیری کارە تەکنیکییە ئاستبەرزەکانی سینەماکارە ڕێپێدراوەکان بکە."}
+                          </p>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-3">
+                          {(() => {
+                            const communityPortfolioItems = creators.flatMap(creator => 
+                              creator.portfolio.map(portItem => ({
+                                ...portItem,
+                                creatorId: creator.id,
+                                creatorName: creator.name,
+                                creatorAvatar: creator.avatarUrl,
+                                creatorRole: creator.role
+                              }))
+                            );
+                            
+                            const userPortfolioItems = myProfile.portfolio.map(portItem => ({
+                              ...portItem,
+                              creatorId: "me",
+                              creatorName: myProfile.name,
+                              creatorAvatar: myProfile.avatarUrl,
+                              creatorRole: myProfile.role
+                            }));
+                            
+                            const allUnifiedPortfolios = [...userPortfolioItems, ...communityPortfolioItems];
+                            
+                            if (allUnifiedPortfolios.length === 0) {
+                              return (
+                                <div className="col-span-2 py-12 text-center text-xs text-gray-500 font-mono uppercase tracking-wider border border-dashed border-gray-900/40 rounded-2xl">
+                                  {lang === "en" ? "No portfolios found" : "هیچ پۆرتفۆلیۆیەک نییە"}
+                                </div>
+                              );
+                            }
+                            
+                            return allUnifiedPortfolios.map((item, index) => (
+                              <div 
+                                key={`${item.id}-${index}`}
+                                className="group bg-[#060606] border border-gray-950 rounded-xl overflow-hidden cursor-pointer relative hover:border-cyan-500/20 transition-all flex flex-col h-full shadow-[0_4px_24px_rgba(0,0,0,0.5)]"
+                              >
+                                <div 
+                                  onClick={() => setActiveLightboxImage(item.url)}
+                                  className="aspect-video relative overflow-hidden bg-black shrink-0 relative cursor-zoom-in"
+                                  title="Expand Project Image"
+                                >
+                                  <img 
+                                    src={item.url} 
+                                    className="w-full h-full object-cover group-hover:scale-105 transition-all duration-500" 
+                                    alt={item.title} 
+                                    referrerPolicy="no-referrer"
+                                  />
+                                  {item.type === "video" && (
+                                    <span className="absolute top-1.5 right-1.5 bg-black/80 text-cyan-400 text-[7px] font-mono border border-cyan-900/40 px-1 rounded font-bold tracking-widest">
+                                      SHOWREEL
+                                    </span>
+                                  )}
+                                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-40" />
+                                </div>
+                                <div className="p-2.5 text-left flex-1 flex flex-col justify-between">
+                                  <div className="space-y-0.5">
+                                    <h4 
+                                      onClick={() => setActiveLightboxImage(item.url)}
+                                      className="text-xs font-bold text-white truncate group-hover:text-cyan-400 transition-colors"
+                                    >
+                                      {item.title}
+                                    </h4>
+                                    {item.description && (
+                                      <p className="text-[10px] text-gray-500 line-clamp-2 leading-relaxed">{item.description}</p>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2 pt-2 border-t border-gray-950 mt-2.5 shrink-0">
+                                    <div 
+                                      className="flex items-center gap-1.5 min-w-0 flex-1 hover:text-cyan-300 transition-all cursor-pointer"
+                                      onClick={() => {
+                                        if (item.creatorId !== "me") {
+                                          setSelectedCreatorId(item.creatorId);
+                                        }
+                                      }}
+                                    >
+                                      <img src={item.creatorAvatar} className="w-5 h-5 rounded-full object-cover border border-gray-900 shrink-0" alt="" referrerPolicy="no-referrer" />
+                                      <div className="min-w-0 flex-1">
+                                        <p className="text-[9.5px] font-bold text-gray-300 truncate leading-none">{item.creatorName}</p>
+                                        <p className="text-[7.5px] text-cyan-400 font-mono truncate leading-none mt-0.5">{item.creatorRole || "Verified Artist"}</p>
+                                      </div>
+                                    </div>
+                                    
+                                    {item.creatorId !== "me" && (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const originalCreatorObj = creators.find(c => c.id === item.creatorId);
+                                          if (originalCreatorObj) {
+                                            handleStartDM(originalCreatorObj);
+                                          } else {
+                                            const dynamicMovieDummy: Movie = {
+                                              id: `m-dyn-${Date.now()}`,
+                                              title: item.title,
+                                              year: "2026",
+                                              genre: item.creatorRole || "Videographer",
+                                              description: item.description || "Portfolio item collaboration",
+                                              director: item.creatorName,
+                                              rating: "5.0",
+                                              backdropUrl: item.url,
+                                              indie: true
+                                            };
+                                            handleStartDMFromFeed(dynamicMovieDummy);
+                                          }
+                                        }}
+                                        className="bg-cyan-950/80 hover:bg-cyan-900 text-cyan-400 border border-cyan-800/40 p-1.5 rounded-lg transition-transform active:scale-95 cursor-pointer shrink-0"
+                                        title="Send message to creator"
+                                      >
+                                        <Send className="w-2.5 h-2.5" />
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            ));
+                          })()}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -2856,100 +3498,26 @@ export default function App() {
                 {/* TAB MY PROFILE */}
                 {activeTab === "my-profile" && (
                   <div className="p-4 space-y-6 flex-1 flex flex-col text-left pb-24">
-                    <div className="flex items-center justify-between">
-                      <h2 className="text-sm uppercase font-mono tracking-widest text-[#00f0ff] font-bold">{currentT.navMyProfile}</h2>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => setIsEditingMyProfile(!isEditingMyProfile)}
-                          className="bg-cyan-950 hover:bg-cyan-900 text-cyan-400 py-1.5 px-3 rounded-lg text-xs font-bold font-mono uppercase tracking-wider border border-cyan-800/40 cursor-pointer flex items-center gap-1"
-                        >
-                          <Edit className="w-3.5 h-3.5" />
-                          {currentT.editProfileBtn}
-                        </button>
-                        <button
-                          onClick={() => setShowAddPortfolio(true)}
-                          className="bg-cyan-950 hover:bg-cyan-900 text-cyan-400 py-1.5 px-3 rounded-lg text-xs font-bold font-mono uppercase tracking-wider border border-cyan-800/40 cursor-pointer flex items-center gap-1"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                          {currentT.addAssetBtn}
-                        </button>
-                      </div>
+                    <div className="flex items-center justify-between border-b border-gray-900/60 pb-3">
+                      <button
+                        type="button"
+                        id="profile-settings-btn"
+                        onClick={() => setIsSettingsOpen(true)}
+                        className="bg-cyan-950/40 hover:bg-cyan-900/60 border border-cyan-800/20 text-cyan-400 p-2.5 rounded-xl cursor-pointer transition-all active:scale-95 flex items-center justify-center shrink-0"
+                        title={lang === "en" ? "Settings" : "ڕێکخستنەکان"}
+                      >
+                        <Settings className="w-4.5 h-4.5" />
+                      </button>
+                      <h2 className="text-sm uppercase font-mono tracking-widest text-[#00f0ff] font-bold text-center flex-1">
+                        {currentT.navMyProfile}
+                      </h2>
+                      <div className="w-9.5 h-9.5 shrink-0" /> {/* Spacer */}
                     </div>
 
-                    {/* MODAL EDIT PROFILE */}
-                    {isEditingMyProfile && (
-                      <div className="bg-[#090909] border border-cyan-400/20 p-4 rounded-xl space-y-4">
-                        <h4 className="text-xs font-mono tracking-wider uppercase text-cyan-400 font-bold">{currentT.editHeading}</h4>
-                        <div className="grid grid-cols-1 gap-3 text-xs">
-                          <div className="space-y-1">
-                            <label className="text-gray-500 font-mono font-medium">{currentT.name}</label>
-                            <input type="text" className="w-full bg-black rounded-lg p-2 border border-gray-900 text-white focus:outline-none" value={editName} onChange={(e) => setEditName(e.target.value)} />
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-gray-500 font-mono font-medium">{currentT.role}</label>
-                            <input type="text" className="w-full bg-black rounded-lg p-2 border border-gray-900 text-white focus:outline-none" value={editRole} onChange={(e) => setEditRole(e.target.value)} />
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-gray-500 font-mono font-medium">{currentT.location}</label>
-                            <input type="text" className="w-full bg-black rounded-lg p-2 border border-gray-900 text-white focus:outline-none" value={editLocation} onChange={(e) => setEditLocation(e.target.value)} />
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-gray-500 font-mono font-medium">{currentT.bioTitle}</label>
-                            <textarea className="w-full bg-black rounded-lg p-2 border border-gray-900 text-white focus:outline-none h-20" value={editBio} onChange={(e) => setEditBio(e.target.value)} />
-                          </div>
-                        </div>
-                        <div className="flex gap-2 justify-end">
-                          <button onClick={() => setIsEditingMyProfile(false)} className="px-3 py-1.5 rounded-lg text-xs bg-gray-950 hover:bg-gray-900 font-mono cursor-pointer">{currentT.cancel}</button>
-                          <button onClick={handleSaveProfile} className="px-3 py-1.5 rounded-lg text-xs bg-cyan-950 text-cyan-400 border border-cyan-800 hover:bg-cyan-900 font-mono font-semibold cursor-pointer">{currentT.saveProfileBtn}</button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* MODAL ADD PORTFOLIO ASSET */}
-                    {showAddPortfolio && (
-                      <div className="bg-[#090909] border border-cyan-400/20 p-4 rounded-xl space-y-4">
-                        <h4 className="text-xs font-mono tracking-wider uppercase text-cyan-400 font-bold">{currentT.addAssetHeading}</h4>
-                        <div className="grid grid-cols-1 gap-3 text-xs">
-                          <div className="space-y-1">
-                            <label className="text-gray-500 font-mono font-medium">{currentT.assetTitle}</label>
-                            <input type="text" className="w-full bg-black rounded-lg p-2 border border-gray-900 text-white focus:outline-none" placeholder="Lost Neon Studio still" value={newPortTitle} onChange={(e) => setNewPortTitle(e.target.value)} />
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-gray-500 font-mono font-medium">{currentT.assetUrl}</label>
-                            <input type="text" className="w-full bg-black rounded-lg p-2 border border-gray-900 text-white focus:outline-none" placeholder="https://images.unsplash.com/..." value={newPortUrl} onChange={(e) => setNewPortUrl(e.target.value)} />
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-gray-500 font-mono font-medium">{currentT.assetDesc}</label>
-                            <input type="text" className="w-full bg-black rounded-lg p-2 border border-gray-900 text-white focus:outline-none" placeholder="Rec.709 color suite test" value={newPortDesc} onChange={(e) => setNewPortDesc(e.target.value)} />
-                          </div>
-                          <div className="grid grid-cols-2 gap-2">
-                            <div className="space-y-1">
-                              <label className="text-gray-500 font-mono font-medium">{currentT.typeSelect}</label>
-                              <select className="w-full bg-black rounded-lg p-2 border border-gray-900 text-white focus:outline-none" value={newPortType} onChange={(e) => setNewPortType(e.target.value as any)}>
-                                <option value="image">{currentT.typeImage}</option>
-                                <option value="video">{currentT.typeVideo}</option>
-                              </select>
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-gray-500 font-mono font-medium">{currentT.aspectSelect}</label>
-                              <select className="w-full bg-black rounded-lg p-2 border border-gray-900 text-white focus:outline-none" value={newPortAspect} onChange={(e) => setNewPortAspect(e.target.value as any)}>
-                                <option value="landscape">{currentT.aspectL}</option>
-                                <option value="portrait">{currentT.aspectP}</option>
-                                <option value="square">{currentT.aspectS}</option>
-                              </select>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex gap-2 justify-end">
-                          <button onClick={() => setShowAddPortfolio(false)} className="px-3 py-1.5 rounded-lg text-xs bg-gray-950 hover:bg-gray-900 font-mono cursor-pointer">{currentT.cancel}</button>
-                          <button onClick={handleAddPortfolioItem} className="px-3 py-1.5 rounded-lg text-xs bg-cyan-950 text-cyan-400 border border-cyan-800 hover:bg-cyan-900 font-mono font-semibold cursor-pointer">{currentT.addBtn}</button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Self profile layout rendering */}
+                    {/* Self profile layout rendering - REDESIGNED PROPORTIONAL PROFILE CARD */}
                     <div className="space-y-4">
-                      <div className="bg-[#080808] border border-gray-900 rounded-xl p-4 flex gap-4 items-center">
+                      {/* Centered Circular Avatar and Identity layout */}
+                      <div className="bg-[#080808] border border-gray-900 rounded-2xl px-6 py-8 md:px-8 md:py-10 w-full max-w-xl mx-auto flex flex-col items-center text-center gap-5 shadow-[0_8px_32px_rgba(0,0,0,0.6)] transition-all">
                         <input 
                           type="file" 
                           ref={profileImgInputRef}
@@ -2961,82 +3529,98 @@ export default function App() {
                           accept="image/*"
                           className="hidden"
                         />
-                        <div className="relative group shrink-0">
-                          <img src={myProfile.avatarUrl} className="w-14 h-14 rounded-lg object-cover border border-cyan-400 bg-black" alt="" />
+                        
+                        {/* perfectly circular avatar placed directly above description/bio */}
+                        <div className="relative group/avatar shrink-0 mb-1">
+                          <img 
+                            src={myProfile.avatarUrl} 
+                            className="w-24 h-24 rounded-full object-cover border border-cyan-400 bg-black shadow-[0_0_20px_rgba(6,182,212,0.25)] group-hover/avatar:border-cyan-300 transition-all duration-300" 
+                            alt="" 
+                          />
                           <button 
                             type="button"
                             onClick={() => profileImgInputRef.current?.click()}
-                            className="absolute inset-0 bg-black/75 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-lg transition-all text-cyan-400 cursor-pointer border border-cyan-400/30"
+                            className="absolute inset-0 bg-black/75 opacity-0 group-hover/avatar:opacity-100 flex items-center justify-center rounded-full transition-all text-cyan-400 cursor-pointer border border-cyan-400/30"
                             title="Change Photo"
                           >
-                            <Camera className="w-4 h-4" />
+                            <Camera className="w-5 h-5" />
                           </button>
                           <button 
                             type="button"
                             onClick={() => profileImgInputRef.current?.click()}
-                            className="absolute -bottom-1 -right-1 bg-cyan-950 text-cyan-400 p-1 rounded-md border border-cyan-800 hover:bg-cyan-900 shadow-md cursor-pointer flex items-center justify-center"
+                            className="absolute -bottom-1 -right-1 bg-cyan-950 text-cyan-400 p-1.5 rounded-full border border-cyan-850 hover:bg-cyan-900 shadow-md cursor-pointer flex items-center justify-center"
                             title="Change Photo"
                           >
-                            <Camera className="w-2.5 h-2.5" />
+                            <Camera className="w-3 h-3" />
                           </button>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <span className="text-[9px] uppercase tracking-wider font-mono text-cyan-400 font-bold bg-cyan-950 px-2 py-0.5 rounded border border-cyan-500/20">{myProfile.role}</span>
-                          <h3 className="text-md font-bold text-white mt-1 truncation">{myProfile.name}</h3>
-                          <p className="text-xs text-gray-400 flex items-center gap-0.5 mt-0.5 leading-none">
+
+                        <div className="space-y-1">
+                          <h3 className="text-lg sm:text-xl font-bold text-white tracking-tight leading-tight">{myProfile.name}</h3>
+                          
+                          {/* Centered Role Badge */}
+                          <div className="flex justify-center pt-0.5">
+                            <span className="inline-block text-[9px] uppercase tracking-widest font-mono text-cyan-400 font-bold bg-cyan-950/65 px-3 py-1 rounded-md border border-cyan-800/25">
+                              {myProfile.role}
+                            </span>
+                          </div>
+
+                          <p className="text-xs text-gray-400 flex items-center justify-center gap-1 mt-1 leading-none">
                             <MapPin className="w-3.5 h-3.5 text-cyan-400/80 shrink-0" />
                             {myProfile.location}
                           </p>
                         </div>
-                        <div className="text-right shrink-0">
-                          <p className="text-[10px] font-mono text-gray-500">{currentT.views}</p>
-                          <p className="text-sm font-bold font-mono text-cyan-400">{myProfile.views}</p>
+
+                        {/* Interactive Followers & Following counts next to/below avatar alongside views */}
+                        <div className="flex items-center justify-center gap-4 py-2 px-4 rounded-xl bg-black/45 border border-gray-900/60 flex-wrap max-w-sm mt-1">
+                          <button
+                            id="header-followers-stats"
+                            type="button"
+                            onClick={() => {
+                              setModalUserList({
+                                title: lang === "en" ? "My Followers" : "فۆڵۆوەرەکانم",
+                                users: followsMap["me"]?.followers || []
+                              });
+                            }}
+                            className="hover:text-cyan-400 text-gray-300 transition-colors cursor-pointer text-left flex items-baseline gap-1"
+                          >
+                            <span className="text-xs sm:text-sm font-bold font-mono text-cyan-400">{getFollowersCount("me")}</span>
+                            <span className="text-[9px] text-gray-400 uppercase tracking-wider font-semibold font-mono">{lang === "en" ? "Followers" : "فۆڵۆوەران"}</span>
+                          </button>
+                          
+                          <span className="text-gray-800 font-bold text-xs">•</span>
+                          
+                          <button
+                            id="header-following-stats"
+                            type="button"
+                            onClick={() => {
+                              setModalUserList({
+                                title: lang === "en" ? "Following Users" : "فۆڵۆوکراوەکان",
+                                users: followsMap["me"]?.following || []
+                              });
+                            }}
+                            className="hover:text-cyan-400 text-gray-300 transition-colors cursor-pointer text-left flex items-baseline gap-1"
+                          >
+                            <span className="text-xs sm:text-sm font-bold font-mono text-cyan-400">{getFollowingCount("me")}</span>
+                            <span className="text-[9px] text-gray-400 uppercase tracking-wider font-semibold font-mono">{lang === "en" ? "Following" : "فۆڵۆوکراو"}</span>
+                          </button>
+
+                          <span className="text-gray-800 font-bold text-xs">•</span>
+
+                          <div className="flex items-baseline gap-1">
+                            <span className="text-xs sm:text-sm font-bold font-mono text-cyan-400">{myProfile.views}</span>
+                            <span className="text-[9px] text-gray-400 uppercase tracking-wider font-semibold font-mono">{currentT.views}</span>
+                          </div>
+                        </div>
+
+                        {/* Description / Bio Section located directly below the circular avatar elements */}
+                        <div className="w-full text-center space-y-1.5 bg-black/40 border border-gray-900 px-4 py-3 pb-4 rounded-xl mt-1">
+                          <h4 className="text-[9px] uppercase font-mono tracking-widest text-cyan-400 font-bold">{currentT.bioTitle}</h4>
+                          <p className="text-xs text-gray-300 leading-relaxed font-normal">{myProfile.bio}</p>
                         </div>
                       </div>
 
-                      {/* Language Selection Toggle */}
-                      <div className="bg-black/60 border border-gray-900 rounded-xl p-4 space-y-3 text-left">
-                        <div className="flex items-center gap-2">
-                          <Globe className="w-4 h-4 text-cyan-400" />
-                          <h4 className="text-[10px] uppercase font-mono tracking-widest text-[#00f0ff] font-bold">
-                            {lang === "en" ? "App Language" : "زمانی ئەپ"}
-                          </h4>
-                        </div>
-                        <p className="text-[11px] text-gray-400">
-                          {lang === "en" 
-                            ? "Select your interface language for the workspace." 
-                            : "زمانی دڵخوازی خۆت دیاریبکە بۆ ڕووکاری کارکردنی ئەپەکە."}
-                        </p>
-                        <div className="grid grid-cols-2 gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleSelectLanguage("en")}
-                            className={`py-2 px-3 text-xs font-mono font-bold rounded-lg border transition-all cursor-pointer ${
-                              lang === "en" 
-                                ? "bg-cyan-950/45 text-cyan-400 border-cyan-500/40" 
-                                : "bg-[#050505] text-gray-400 border-gray-900 hover:border-gray-800"
-                            }`}
-                          >
-                            English (EN)
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleSelectLanguage("ckb")}
-                            className={`py-2 px-3 text-xs font-semibold rounded-lg border transition-all cursor-pointer ${
-                              lang === "ckb" 
-                                ? "bg-cyan-950/45 text-cyan-400 border-cyan-500/40" 
-                                : "bg-[#050505] text-gray-400 border-gray-900 hover:border-gray-800"
-                            }`}
-                          >
-                            کوردی (CKB)
-                          </button>
-                        </div>
-                      </div>
 
-                      <div className="bg-black/40 border border-gray-900 p-3.5 rounded-xl space-y-1.5">
-                        <h4 className="text-[10px] uppercase font-mono tracking-widest text-cyan-400 font-bold">{currentT.bioTitle}</h4>
-                        <p className="text-xs text-gray-300 leading-relaxed font-normal">{myProfile.bio}</p>
-                      </div>
 
                       <div className="space-y-3">
                         <h4 className="text-[10px] uppercase font-mono tracking-widest text-cyan-400 font-bold">{currentT.portfolioTitle}</h4>
@@ -3072,8 +3656,7 @@ export default function App() {
           {/* App primary bottom bar */}
           {!(activeTab === "chat" && activeConvId !== null) && (
             <div 
-              style={{ position: 'fixed', bottom: 0, left: 0, width: '100%', zIndex: 50 }}
-              className="bg-[#030303]/95 backdrop-blur-md border-t border-gray-900 h-16 shrink-0 flex items-stretch justify-around"
+              className="absolute bottom-0 inset-x-0 bg-[#030303]/98 backdrop-blur-md border-t border-gray-900 h-16 flex items-stretch justify-around z-50"
             >
               <button 
                 id="nav-tab-biner"
@@ -3154,48 +3737,76 @@ export default function App() {
 
           {/* NEW POST MODAL */}
           {showAddPostModal && (
-            <div className="fixed inset-0 bg-[#020202]/90 backdrop-blur-md flex items-center justify-center p-4 z-[100] animate-fadeIn">
-              <div className="bg-[#080808] border border-cyan-500/20 rounded-2xl p-6 w-full max-w-sm space-y-4 shadow-[0_0_50px_rgba(6,182,212,0.15)] ring-1 ring-cyan-400/20 text-left">
-                <div className="flex items-center justify-between border-b border-gray-900 pb-3">
-                  <h3 className="text-sm font-bold font-mono uppercase tracking-widest text-cyan-400 flex items-center gap-1.5 font-bold">
-                    <Plus className="w-4 h-4 text-cyan-400" />
-                    {lang === "en" ? "Publish Work" : "بڵاوکردنەوەی کار"}
+            <div className="fixed inset-0 bg-[#020202]/92 backdrop-blur-md flex items-center justify-center p-4 z-[100] animate-fadeIn">
+              <div className="bg-[#080808] border border-cyan-500/20 rounded-2xl w-full max-w-md shadow-[0_0_80px_rgba(6,182,212,0.18)] ring-1 ring-cyan-400/20 text-left overflow-hidden flex flex-col">
+                
+                {/* Header resembling Facebook's composer header */}
+                <div className="flex items-center justify-between border-b border-gray-900 p-4 shrink-0 bg-[#060606]">
+                  <h3 className="text-xs uppercase font-mono tracking-widest text-[#00f0ff] font-bold">
+                    {lang === "en" ? "Create Post" : "دروستکردنی پۆست"}
                   </h3>
                   <button 
                     type="button" 
                     onClick={() => setShowAddPostModal(false)}
-                    className="text-gray-500 hover:text-white transition-colors cursor-pointer"
+                    className="bg-gray-950 hover:bg-gray-900 border border-gray-900 text-gray-500 hover:text-white transition-all rounded-full p-1.5 cursor-pointer"
                   >
                     <X className="w-4 h-4" />
                   </button>
                 </div>
 
-                <form onSubmit={handleSaveNewPost} className="space-y-4 text-xs">
+                <form onSubmit={handleSaveNewPost} className="p-5 space-y-4 text-xs overflow-y-auto max-h-[80vh] no-scrollbar">
+                  
+                  {/* Persona Identifier at Top */}
+                  <div className="flex items-center gap-3">
+                    <img 
+                      src={myProfile.avatarUrl} 
+                      className="w-10 h-10 rounded-full object-cover border border-cyan-500/20 shadow-md referrer-no-referrer" 
+                      alt="Creator Avatar" 
+                      referrerPolicy="no-referrer"
+                    />
+                    <div>
+                      <h4 className="text-xs font-bold text-white leading-none">{myProfile.name}</h4>
+                      <p className="text-[9px] font-mono text-cyan-400 flex items-center gap-1 mt-1 leading-none">
+                        <Globe className="w-2.5 h-2.5 text-cyan-400 shrink-0" />
+                        {lang === "en" ? "Public / Workspace" : "گشتی / شوێنی کار"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Facebook style title input */}
                   <div className="space-y-1">
-                    <label className="text-gray-400 font-mono font-bold uppercase tracking-wider text-[9px]">
-                      {lang === "en" ? "Title" : "ناونیشانی کار"}
-                    </label>
                     <input 
                       type="text" 
                       required
-                      className="w-full bg-black rounded-xl p-2.5 border border-gray-900 text-white focus:outline-none focus:border-cyan-400/50 transition-colors" 
-                      placeholder={lang === "en" ? "e.g., Chromatic Noir" : "بۆ نموونە: تیشکی مۆر"}
+                      className="w-full bg-transparent text-sm font-bold text-white border-b border-gray-900 pb-2 focus:outline-none focus:border-cyan-400/40 placeholder-gray-600 transition-colors" 
+                      placeholder={lang === "en" ? "Project Title / Head ..." : "ناونیشانی کارەکە تاپۆ بکە..."}
                       value={newPostTitle} 
                       onChange={(e) => setNewPostTitle(e.target.value)} 
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  {/* Large text caption/desc area */}
+                  <div className="space-y-1">
+                    <textarea 
+                      className="w-full bg-transparent text-xs text-gray-200 focus:outline-none placeholder-gray-600 h-20 resize-none leading-relaxed" 
+                      placeholder={lang === "en" ? "What's on your cinematic mind, Vanya?" : "چی لە خەیاڵی داهێنەرانەی سینەماییتدایە...؟"}
+                      value={newPostDesc} 
+                      onChange={(e) => setNewPostDesc(e.target.value)} 
+                    />
+                  </div>
+
+                  {/* Side-by-side meta metadata options */}
+                  <div className="grid grid-cols-2 gap-3 pb-1">
                     <div className="space-y-1">
-                      <label className="text-gray-400 font-mono font-bold uppercase tracking-wider text-[9px]">
+                      <label className="text-gray-500 font-mono font-bold uppercase tracking-wider text-[8px]">
                         {lang === "en" ? "Category / Role" : "جۆر / دەور"}
                       </label>
                       <select 
-                        className="w-full bg-black rounded-xl p-2.5 border border-gray-900 text-white focus:outline-none focus:border-cyan-400/50 transition-colors cursor-pointer"
+                        className="w-full bg-black rounded-lg p-2 border border-gray-900 text-white focus:outline-none focus:border-cyan-400/40 transition-colors cursor-pointer text-[11px]"
                         value={newPostCategory} 
                         onChange={(e) => setNewPostCategory(e.target.value)}
                       >
-                        <option value="Athlete">{lang === "en" ? "Athlete" : "وەرزشکار"}</option>
+                        <option value="Artist">{lang === "en" ? "Artist" : "سینەماکار"}</option>
                         <option value="Videographer">{lang === "en" ? "Videographer" : "وێنەگر"}</option>
                         <option value="Editor">{lang === "en" ? "Editor" : "مۆنتێر"}</option>
                         <option value="Designer">{lang === "en" ? "Designer" : "دیزاینەر"}</option>
@@ -3203,34 +3814,87 @@ export default function App() {
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-gray-400 font-mono font-bold uppercase tracking-wider text-[9px]">
+                      <label className="text-gray-500 font-mono font-bold uppercase tracking-wider text-[8px]">
                         {lang === "en" ? "Year" : "ساڵ"}
                       </label>
                       <input 
                         type="text" 
-                        className="w-full bg-black rounded-xl p-2.5 border border-gray-900 text-white focus:outline-none focus:border-cyan-400/50 transition-colors" 
+                        className="w-full bg-black rounded-lg p-2 border border-gray-900 text-white focus:outline-none focus:border-cyan-400/40 transition-colors text-[11.5px]" 
                         value={newPostYear} 
                         onChange={(e) => setNewPostYear(e.target.value)} 
                       />
                     </div>
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="text-gray-400 font-mono font-bold uppercase tracking-wider text-[9px]">
-                      {lang === "en" ? "Description" : "کورتەی کار"}
+                  {/* Facebook-style Tagging section (Capsules selector) */}
+                  <div className="space-y-1.5 pb-1 border-t border-gray-950 pt-3">
+                    <label className="text-gray-500 font-mono font-medium uppercase tracking-wider text-[8.5px]">
+                      {lang === "en" ? "Add Hashtags" : "زیادکردنی تاگ یان هاشتاگ"}
                     </label>
-                    <textarea 
-                      className="w-full bg-black rounded-xl p-2.5 border border-gray-900 text-white focus:outline-none focus:border-cyan-400/50 transition-colors h-16 resize-none" 
-                      placeholder={lang === "en" ? "Describe your spectacular work..." : "کورتەیەک بنووسە لەسەر کارەکەت..."}
-                      value={newPostDesc} 
-                      onChange={(e) => setNewPostDesc(e.target.value)} 
-                    />
+                    <div className="flex items-center gap-1.5 bg-black rounded-xl p-1.5 border border-gray-900 focus-within:border-cyan-400/50">
+                      <input
+                        type="text"
+                        className="flex-1 bg-transparent text-xs text-white focus:outline-none placeholder-gray-700"
+                        placeholder={lang === "en" ? "Type tag & press enter/button..." : "بنووسە و دوگمەکە دابگرە..."}
+                        value={newPostTagInput}
+                        onChange={(e) => setNewPostTagInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            if (newPostTagInput.trim()) {
+                              const cleanTag = newPostTagInput.trim().replace(/^#+/, "");
+                              if (!newPostTags.includes(cleanTag)) {
+                                setNewPostTags(prev => [...prev, cleanTag]);
+                              }
+                              setNewPostTagInput("");
+                            }
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (newPostTagInput.trim()) {
+                            const cleanTag = newPostTagInput.trim().replace(/^#+/, "");
+                            if (!newPostTags.includes(cleanTag)) {
+                              setNewPostTags(prev => [...prev, cleanTag]);
+                            }
+                            setNewPostTagInput("");
+                          }
+                        }}
+                        className="bg-cyan-950 hover:bg-cyan-900 border border-cyan-800/40 text-cyan-400 py-1 px-2.5 rounded-lg text-[9.5px] font-bold uppercase cursor-pointer"
+                      >
+                        {lang === "en" ? "+ Add" : "+ زیادکردن"}
+                      </button>
+                    </div>
+                    
+                    {/* Active tag pills list */}
+                    {newPostTags.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {newPostTags.map((tag) => (
+                          <span 
+                            key={tag} 
+                            className="text-[9px] font-mono text-cyan-400 bg-cyan-950/35 border border-cyan-900/40 rounded-lg px-2 py-0.5 flex items-center gap-1.5 shrink-0"
+                          >
+                            #{tag}
+                            <button
+                              type="button"
+                              onClick={() => setNewPostTags(prev => prev.filter(t => t !== tag))}
+                              className="text-gray-400 hover:text-red-400 transition-colors rounded-full font-bold text-[10px] w-2.5 h-2.5 flex items-center justify-center cursor-pointer"
+                            >
+                              &times;
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
-                  {/* PHOTO INPUT WITH DUAL DRAG-DROP OR URL FALLBACK */}
-                  <div className="space-y-2">
-                    <label className="text-gray-400 font-mono font-bold uppercase tracking-wider text-[9px]">
-                      {lang === "en" ? "Work Backdrop Image" : "وێنەی پاشبنەمای کار"}
+                  {/* MEDIA BOX SECTION (Facebook style "Add Media") */}
+                  <div className="space-y-2 border-t border-gray-950 pt-3">
+                    <label className="text-gray-500 font-mono font-medium uppercase tracking-wider text-[8.5px] flex items-center gap-1">
+                      <Camera className="w-3.5 h-3.5 text-gray-500" />
+                      {lang === "en" ? "Cover Frame Upload / Media" : "بارکردنی وێنەی پاشبنەما"}
                     </label>
                     <input 
                       type="file" 
@@ -3258,48 +3922,337 @@ export default function App() {
                     ) : (
                       <div 
                         onClick={() => postImgInputRef.current?.click()}
-                        className="border border-dashed border-gray-800 hover:border-cyan-400/40 rounded-xl p-5 flex flex-col items-center justify-center gap-1.5 cursor-pointer bg-black/40 hover:bg-cyan-950/15 transition-all text-center group"
+                        className="border border-dashed border-gray-900 hover:border-cyan-400/40 rounded-xl p-5 flex flex-col items-center justify-center gap-1.5 cursor-pointer bg-black/40 hover:bg-cyan-950/15 transition-all text-center group"
                       >
-                        <Camera className="w-5 h-5 text-gray-600 group-hover:text-cyan-400 transition-colors" />
+                        <ImageIcon className="w-5 h-5 text-gray-700 group-hover:text-cyan-400 transition-colors" />
                         <div className="space-y-0.5">
-                          <p className="text-[10px] text-gray-400 font-medium">{lang === "en" ? "Click to Upload" : "کلیک بکە بۆ بارکردنی وێنە"}</p>
-                          <p className="text-[8.5px] text-gray-600">{lang === "en" ? "Supports PNG, JPG, WebP" : "پشتیگیری فایلی وێنەیی دەکات"}</p>
+                          <p className="text-[10px] text-gray-400 font-medium">{lang === "en" ? "Drag / Click to Add Photo" : "کلیک بکە بۆ بارکردنی وێنە"}</p>
+                          <p className="text-[8.5px] text-gray-600">{lang === "en" ? "Supports PNG, JPG, WebP metadata" : "پشتیگیری فایلی وێنەیی دەکات"}</p>
                         </div>
                       </div>
                     )}
 
-                    <div className="text-center font-mono text-[8px] text-gray-600">
-                      {lang === "en" ? "— OR PASTE IMAGE URL —" : "— یاخود بەستەری وێنەکە دابنێ —"}
+                    <div className="text-center font-mono text-[7px] text-gray-600">
+                      — {lang === "en" ? "OR PASTE FRAME LINK" : "یاخود بەستەری ڕاستەوخۆ بنووسە"} —
                     </div>
 
                     <input 
                       type="text" 
-                      className="w-full bg-black rounded-xl p-2 border border-gray-900 text-gray-300 focus:outline-none focus:border-cyan-400/40 transition-colors text-[10px]" 
+                      className="w-full bg-black rounded-lg p-2 border border-gray-900 text-gray-300 focus:outline-none focus:border-cyan-400/45 transition-colors text-[10px]" 
                       placeholder="https://images.unsplash.com/..."
                       value={newPostPhoto} 
                       onChange={(e) => setNewPostPhoto(e.target.value)} 
                     />
                   </div>
 
-                  <div className="flex gap-2 justify-end pt-2 border-t border-gray-900">
+                  {/* Submission and Action Bar resembling Facebook's publish strip */}
+                  <div className="flex gap-2 justify-end pt-3 border-t border-gray-900">
                     <button 
                       type="button"
                       onClick={() => setShowAddPostModal(false)} 
-                      className="px-3.5 py-2 rounded-xl text-xs bg-gray-950 text-gray-400 hover:bg-gray-900 border border-gray-900/60 transition-colors cursor-pointer font-mono font-semibold"
+                      className="px-4 py-2.5 rounded-xl text-xs bg-gray-950 text-gray-400 hover:bg-gray-900 border border-gray-900/60 transition-colors cursor-pointer font-mono font-semibold"
                     >
                       {lang === "en" ? "Cancel" : "پاشگەزبوونەوە"}
                     </button>
                     <button 
                       type="submit" 
-                      className="px-3.5 py-2 rounded-xl text-xs bg-cyan-950 text-cyan-400 border border-cyan-800 hover:bg-cyan-900 transition-colors cursor-pointer font-mono font-bold"
+                      className="flex-1 px-4 py-2.5 rounded-xl text-xs bg-cyan-950 text-cyan-400 border border-cyan-850 hover:bg-cyan-900/80 transition-colors cursor-pointer font-mono font-bold text-center uppercase tracking-widest"
                     >
-                      {lang === "en" ? "Publish Post" : "بڵاوکردنەوە"}
+                      {lang === "en" ? "Publish Work" : "بڵاوکردنەوە"}
                     </button>
                   </div>
                 </form>
               </div>
             </div>
           )}
+
+          {/* AI CHAT MODAL OVERLAY */}
+          <AnimatePresence>
+            {isAIChatOpen && (
+              <motion.div
+                id="ai-chat-overlay"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="fixed inset-0 bg-[#020202]/92 backdrop-blur-md flex items-center justify-center p-4 z-[100]"
+              >
+                <motion.div
+                  initial={{ opacity: 0, y: 35, scale: 0.96 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 35, scale: 0.96 }}
+                  transition={{ type: "spring", damping: 25, stiffness: 350, mass: 0.5 }}
+                  className="bg-[#080808] border border-cyan-500/20 rounded-2xl w-full max-w-lg shadow-[0_0_80px_rgba(6,182,212,0.18)] ring-1 ring-cyan-400/20 text-left overflow-hidden flex flex-col h-[85vh] max-h-[750px]"
+                >
+                
+                {/* Header */}
+                <div className="flex items-center justify-between border-b border-gray-900 p-4 shrink-0 bg-[#060606]">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 bg-cyan-950/60 rounded-xl border border-cyan-800/40 text-cyan-400">
+                      <Sparkles className="w-5 h-5 animate-pulse" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs uppercase font-mono tracking-widest text-[#00f0ff] font-bold leading-none">
+                        {lang === "en" ? "AI Cinema Partner" : "هاوبەشی سینەمایی بگری"}
+                      </h3>
+                      <p className="text-[10px] text-gray-500 font-mono mt-1.5 leading-none">
+                        {currentT.moodSearchSub}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {aiConversationContext.length > 0 && (
+                      <button
+                        id="clear-ai-context"
+                        onClick={() => {
+                          setAiConversationContext([]);
+                          setAiPartnerResponse(null);
+                          setMoodSearchResults([]);
+                          showToast(lang === "ckb" ? "گفتوگۆکە پاککرایەوە" : "Conversation logs cleared.");
+                        }}
+                        className="text-[10px] uppercase font-mono text-gray-500 hover:text-cyan-400 p-2 hover:bg-gray-950 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                        title={lang === "ckb" ? "پاککردنەوە" : "Clear chat"}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">{lang === "ckb" ? "پاککردنەوە" : "Clear"}</span>
+                      </button>
+                    )}
+                    <button 
+                      type="button" 
+                      id="close-ai-chat"
+                      onClick={() => setIsAIChatOpen(false)}
+                      className="bg-gray-950 hover:bg-gray-900 border border-gray-900 text-gray-500 hover:text-white transition-all rounded-full p-2 cursor-pointer"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Body */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar bg-black/40">
+                  {/* If history is empty, show a pleasant welcome screen with quick suggestions */}
+                  {aiConversationContext.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-6">
+                      <div className="relative w-16 h-16 flex items-center justify-center">
+                        <div className="absolute inset-0 rounded-full border border-cyan-500/20 animate-ping opacity-75" />
+                        <div className="w-12 h-12 rounded-full bg-cyan-950/40 border border-cyan-500/30 flex items-center justify-center">
+                          <Sparkles className="w-6 h-6 text-cyan-400 animate-pulse" />
+                        </div>
+                      </div>
+                      <div className="space-y-2 max-w-sm">
+                        <h4 className="text-sm font-bold text-white uppercase tracking-wider font-mono">
+                          {lang === "en" ? "How can I help you, Creator?" : "چۆن دەتوانم هاوکاریت بکەم، سینەماکار؟"}
+                        </h4>
+                        <p className="text-xs text-gray-400 leading-relaxed">
+                          {lang === "en" 
+                            ? "I can brainstorm script concepts, design colors based on lighting moods, recommend reference films, or search specific plots." 
+                            : "من دەتوانم بیرۆکەی نوێی سیناریۆ پێشنیار بکەم، یان هاوکارت بم لە دۆزینەوەی فیلمە دڵخوازە دێرینەکان."}
+                        </p>
+                      </div>
+
+                      {/* Quick suggestions */}
+                      <div className="space-y-2 w-full max-w-md pt-2 text-left">
+                        <span className="text-[9px] uppercase font-mono tracking-wider text-gray-600 block text-center">
+                          {currentT.quickPrompts}
+                        </span>
+                        <div className="grid grid-cols-1 gap-2">
+                          {[
+                            {
+                              label: lang === "ckb" ? "بیرۆکەی نوار" : "Neon Cyberpunk Film Concept",
+                              prompt: "Give me a neon cyberpunk movie concept based in Erbil, Kurdistan"
+                            },
+                            {
+                              label: lang === "ckb" ? "فیلمی ڕەشەبا" : "Identify movie with a blackhole dock",
+                              prompt: "Identify the movie where a crew docks into a spinning station near a blackhole"
+                            },
+                            {
+                              label: lang === "ckb" ? "فیدباکی چیرۆک" : "Psychological Script Feedback",
+                              prompt: "Give me creative feedback on an independent short film script about a video editor who can slice reality."
+                            }
+                          ].map((item, idx) => (
+                            <button
+                              key={idx}
+                              onClick={() => {
+                                setMoodSearchQuery(item.label);
+                                handleMoodSearch(item.prompt);
+                              }}
+                              className="text-xs text-left text-gray-400 bg-[#0d0d0d] hover:text-cyan-400 hover:border-cyan-400/40 border border-gray-900 rounded-xl px-4 py-3 cursor-pointer transition-all hover:scale-[1.01] active:scale-99 flex items-center justify-between"
+                            >
+                              <span className="font-semibold truncate pr-2">{item.label}</span>
+                              <ChevronLeft className="w-3.5 h-3.5 text-cyan-400/50 rotate-180 shrink-0" />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Chat logs thread history */
+                    <div className="space-y-4">
+                      {aiConversationContext.map((msg) => (
+                        <div
+                          key={msg.id}
+                          className={`flex flex-col space-y-1 ${msg.role === "user" ? "items-end" : "items-start"}`}
+                        >
+                          <div className="flex items-center gap-1.5 px-1">
+                            <span className="text-[8px] font-mono text-gray-500 uppercase tracking-widest leading-none">
+                              {msg.role === "user" ? (lang === "ckb" ? "تۆ" : "You") : (lang === "ckb" ? "هاوبەشی سینەمایی" : "Cinematic Partner")}
+                            </span>
+                            <span className="text-[8px] font-mono text-gray-600 leading-none">
+                              {msg.timestamp}
+                            </span>
+                          </div>
+                          <div
+                            className={`rounded-2xl px-4 py-3 text-xs leading-relaxed max-w-[85%] ${
+                              msg.role === "user"
+                                ? "bg-cyan-950/30 border border-cyan-800/40 text-cyan-300 text-left"
+                                : "bg-[#0d0d0d] border border-gray-900 text-gray-200 text-left"
+                            }`}
+                          >
+                            {msg.role === "user" ? (
+                              <p className="whitespace-pre-wrap">{msg.text}</p>
+                            ) : (
+                              <div className="space-y-1 text-left prose-invert">
+                                {renderFormattedResponse(msg.text)}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+
+                      {/* Loading status */}
+                      {isMoodSearching && (
+                        <div id="ai-loading-state" className="flex items-start gap-2.5">
+                          <div className="w-8 h-8 rounded-full bg-cyan-950/40 border border-cyan-800/40 flex items-center justify-center shrink-0">
+                            <div className="w-3.5 h-3.5 border-2 border-cyan-400/20 border-t-cyan-400 rounded-full animate-spin" />
+                          </div>
+                          <div className="rounded-2xl px-4 py-3 bg-[#0d0d0d] border border-gray-900 space-y-1 max-w-[80%]">
+                            <p className="text-xs text-cyan-400 font-mono tracking-widest uppercase animate-pulse leading-none font-bold">
+                              {lang === "ckb" ? "پەیوەندیکردن بە هاوبەشی داهێنەر..." : "Consulting Creative Partner..."}
+                            </p>
+                            <p className="text-[10px] text-gray-500">
+                              {lang === "ckb" ? "بەدەستهێنان و لێکدانەوەی ڕەگەزەکانی سینەما..." : "Formulating suggestions..."}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {moodSearchError && (
+                        <p className="text-xs text-red-400 bg-red-950/20 border border-red-950 p-3 rounded-xl">
+                          {moodSearchError}
+                        </p>
+                      )}
+
+                      {/* Dynamic Movie results (Cinematic Reference Deck) rendered inside modal context */}
+                      {moodSearchResults.length > 0 && (
+                        <div id="mood-results-box" className="space-y-3 pt-4 border-t border-gray-900">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] uppercase tracking-widest font-mono text-cyan-400 font-bold flex items-center gap-1.5">
+                              <Film className="w-3.5 h-3.5 text-cyan-400" />
+                              {lang === "ckb" ? "فیلمە هاوشێوەکان" : "Cinematic Reference Deck"}
+                            </span>
+                            <button 
+                              onClick={() => setMoodSearchResults([])}
+                              className="text-[10px] font-mono text-gray-500 hover:text-gray-300 cursor-pointer border border-gray-800 rounded px-1.5 py-0.5"
+                            >
+                              {currentT.cancel}
+                            </button>
+                          </div>
+
+                          <div className="space-y-3 pr-1">
+                            {moodSearchResults.map((movie, index) => (
+                              <div key={movie.id || index} className="bg-black/80 border border-gray-900/60 p-3.5 rounded-xl space-y-2">
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="text-[8px] bg-cyan-950 border border-cyan-850 text-cyan-400 px-1 py-0.2 rounded uppercase font-mono font-bold">
+                                      {movie.indie ? currentT.indie : currentT.globalPro}
+                                    </span>
+                                    <h4 className="text-xs font-bold text-white inline-block">
+                                      {movie.title} ({movie.year})
+                                    </h4>
+                                  </div>
+                                  <span className="text-[10px] font-mono text-gray-400 whitespace-nowrap">⭐ {movie.rating}</span>
+                                </div>
+
+                                <p className="text-[11px] text-gray-400 leading-relaxed italic">
+                                  {movie.description}
+                                </p>
+
+                                <p className="text-[10px] text-gray-500 text-left">
+                                  <strong className="text-gray-400 font-medium">Director:</strong> {movie.director}
+                                </p>
+
+                                {movie.matchReason && (
+                                  <div className="bg-cyan-950/20 border-l-2 border-cyan-400 px-2 py-1 space-y-0.5 rounded-r">
+                                    <p className="text-[9px] uppercase font-mono tracking-widest text-cyan-400 font-bold">{currentT.whyMatchesHeader}</p>
+                                    <p className="text-[10px] text-cyan-300 leading-normal text-left">{movie.matchReason}</p>
+                                  </div>
+                                )}
+
+                                {movie.roleOpportunities && movie.roleOpportunities.length > 0 && (
+                                  <div className="pt-2 border-t border-gray-900/60 flex flex-wrap gap-1 items-center">
+                                    <span className="text-[9px] font-mono text-gray-500 mr-1 flex items-center gap-0.5">
+                                      <Briefcase className="w-2.5 h-2.5" /> {currentT.opportunityHeader}:
+                                    </span>
+                                    {movie.roleOpportunities.map((roleOpt) => (
+                                      <button
+                                        key={roleOpt}
+                                        onClick={() => {
+                                          setActiveTab("sako");
+                                          setGlobalSearchQuery(roleOpt);
+                                          setIsAIChatOpen(false);
+                                          showToast(`Filtering crew collaborators for '${roleOpt}'`);
+                                        }}
+                                        className="text-[9px] font-mono text-cyan-400 hover:text-white bg-cyan-950/40 border border-cyan-900/50 rounded-md px-1.5 py-0.5 transition-colors cursor-pointer"
+                                      >
+                                        {roleOpt}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer Input Area */}
+                <div className="p-4 border-t border-gray-900 shrink-0 bg-[#060606] space-y-2">
+                  <div className="flex items-center gap-2 bg-black/60 rounded-xl p-1.5 border border-gray-950 focus-within:border-cyan-400/50 transition-colors">
+                    <input 
+                      id="mood-search-input"
+                      type="text" 
+                      placeholder={currentT.moodInputPlaceholder}
+                      value={moodSearchQuery}
+                      onChange={(e) => setMoodSearchQuery(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && moodSearchQuery.trim()) {
+                          handleMoodSearch(moodSearchQuery);
+                        }
+                      }}
+                      className="flex-1 bg-transparent text-xs text-white px-2 focus:outline-none placeholder-gray-600 font-sans"
+                    />
+                    <button 
+                      id="submit-mood-search"
+                      onClick={() => handleMoodSearch(moodSearchQuery)}
+                      disabled={isMoodSearching || !moodSearchQuery.trim()}
+                      className="bg-cyan-950 hover:bg-cyan-900 text-cyan-400 p-2.5 rounded-lg border border-cyan-400/30 transition-all disabled:opacity-30 disabled:hover:bg-cyan-950 cursor-pointer shrink-0"
+                    >
+                      {isMoodSearching ? (
+                        <div className="w-3.5 h-3.5 border-2 border-cyan-400/25 border-t-cyan-400 rounded-full animate-spin" />
+                      ) : (
+                        <Send className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* IMAGE LIGHTBOX ZOOM OVERLAY */}
           {zoomedImage && (
@@ -3346,6 +4299,349 @@ export default function App() {
               </p>
             </div>
           )}
+
+          {/* FOLLOWERS / FOLLOWING LIST MODAL */}
+          <AnimatePresence>
+            {modalUserList && (
+              <motion.div 
+                id="user-list-modal-overlay" 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="fixed inset-0 bg-[#020202]/92 backdrop-blur-md flex items-center justify-center p-4 z-[110]"
+              >
+                <motion.div 
+                  initial={{ opacity: 0, y: 25, scale: 0.97 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 25, scale: 0.97 }}
+                  transition={{ type: "spring", damping: 25, stiffness: 350, mass: 0.5 }}
+                  className="bg-[#080808] border border-cyan-500/20 rounded-2xl w-full max-w-sm shadow-[0_0_85px_rgba(6,182,212,0.15)] ring-1 ring-cyan-400/20 text-left overflow-hidden flex flex-col h-[70vh] max-h-[500px]"
+                >
+                  {/* Header */}
+                  <div className="flex items-center justify-between border-b border-gray-900 p-4 shrink-0 bg-[#060606]">
+                    <div className="flex items-center gap-2">
+                      <Users className="w-4 h-4 text-cyan-400" />
+                      <h3 className="text-xs uppercase font-mono tracking-widest text-[#00f0ff] font-bold">
+                        {modalUserList.title}
+                      </h3>
+                    </div>
+                    <button 
+                      type="button" 
+                      onClick={() => setModalUserList(null)}
+                      className="bg-gray-950 hover:bg-gray-900 border border-gray-900 text-gray-500 hover:text-white transition-all rounded-full p-1.5 cursor-pointer"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {/* Body with list of users */}
+                  <div className="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar bg-black/40">
+                    {modalUserList.users.length === 0 ? (
+                      <div className="h-full flex flex-col items-center justify-center text-center p-4">
+                        <span className="text-gray-600 font-mono text-[11px] uppercase tracking-wider">
+                          {lang === "en" ? "Empty List" : "لیستەکە بەتاڵە"}
+                        </span>
+                      </div>
+                    ) : (
+                      modalUserList.users.map((userId) => {
+                        // Resolve user info
+                        const isMe = userId === "me";
+                        const userProfile = isMe 
+                          ? { name: myProfile.name, avatarUrl: myProfile.avatarUrl, role: myProfile.role } 
+                          : creators.find(c => c.id === userId);
+
+                        if (!userProfile) return null;
+
+                        return (
+                          <div 
+                            key={userId} 
+                            className="bg-black/70 border border-gray-900/60 p-3 rounded-xl flex items-center justify-between gap-3 text-left"
+                          >
+                            {/* Profile Info Clickable (Name & Avatar takes to profile) */}
+                            <div 
+                              onClick={() => {
+                                if (isMe) {
+                                  setSelectedCreatorId(null);
+                                  setActiveTab("my-profile");
+                                } else {
+                                  setSelectedCreatorId(userId);
+                                }
+                                setModalUserList(null);
+                                showToast(lang === "en" ? `Viewing profile of ${userProfile.name}` : `سەیرکردنی پرۆفایلی ${userProfile.name}`);
+                              }}
+                              className="flex items-center gap-2.5 min-w-0 cursor-pointer group flex-1"
+                            >
+                              <img 
+                                src={userProfile.avatarUrl} 
+                                className="w-9 h-9 rounded-lg object-cover border border-cyan-800/40 group-hover:border-cyan-400 group-hover:scale-105 transition-all shrink-0 bg-black" 
+                                alt={userProfile.name} 
+                              />
+                              <div className="min-w-0">
+                                <h4 className="text-xs font-semibold text-gray-200 group-hover:text-cyan-400 transition-colors truncate">
+                                  {userProfile.name} {isMe && <span className="text-[9px] text-cyan-400 bg-cyan-950/40 px-1.5 py-0.2 rounded font-mono ml-1">(You)</span>}
+                                </h4>
+                                <p className="text-[10px] text-gray-500 truncate">{userProfile.role}</p>
+                              </div>
+                            </div>
+
+                            {/* Follow / Unfollow button next to each user (if not "me") */}
+                            {!isMe && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  toggleFollowCreator(userId);
+                                }}
+                                className={`px-2.5 py-1 rounded-lg text-[9px] font-mono font-bold uppercase tracking-wider transition-all border shrink-0 cursor-pointer ${
+                                  followingIds.includes(userId)
+                                    ? "bg-gray-950/80 border-gray-800 text-gray-500"
+                                    : "bg-cyan-950/40 border-cyan-500/30 text-cyan-400 hover:bg-cyan-900"
+                                }`}
+                              >
+                                {followingIds.includes(userId) 
+                                  ? (lang === "en" ? "Following" : "فۆڵۆو کراوە") 
+                                  : (lang === "en" ? "Follow" : "فۆڵۆو")}
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* SETTINGS OVERLAY MODAL */}
+          <AnimatePresence>
+            {isSettingsOpen && (
+              <motion.div 
+                id="settings-modal-overlay" 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="fixed inset-0 bg-[#020202]/95 backdrop-blur-md flex items-center justify-center p-4 z-[120]"
+              >
+                <motion.div 
+                  initial={{ opacity: 0, y: 25, scale: 0.97 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 25, scale: 0.97 }}
+                  transition={{ type: "spring", damping: 25, stiffness: 350, mass: 0.5 }}
+                  className="bg-[#080808] border border-cyan-500/20 rounded-2xl w-full max-w-md shadow-[0_0_85px_rgba(6,182,212,0.15)] ring-1 ring-cyan-400/20 text-left overflow-hidden flex flex-col h-[85vh] max-h-[600px] text-xs"
+                >
+                  {/* Header */}
+                  <div className="flex items-center justify-between border-b border-gray-905 p-4 shrink-0 bg-[#060606]">
+                    <div className="flex items-center gap-2">
+                      <Settings className="w-4 h-4 text-cyan-400 animate-spin-slow" />
+                      <h3 className="text-[11px] uppercase font-mono tracking-widest text-[#00f0ff] font-bold">
+                        {lang === "en" ? "Control & Settings" : "ڕێکخستن و کۆنترۆڵ"}
+                      </h3>
+                    </div>
+                    <button 
+                      type="button" 
+                      onClick={() => setIsSettingsOpen(false)}
+                      className="bg-gray-950 hover:bg-gray-900 border border-gray-900 text-gray-500 hover:text-white transition-all rounded-full p-1.5 cursor-pointer"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {/* Body - Scrollable content */}
+                  <div className="flex-1 overflow-y-auto p-5 space-y-6 bg-black/40 no-scrollbar">
+                    {/* 1. APP LANGUAGE */}
+                    <div className="bg-[#0c0c0c] border border-gray-900 rounded-xl p-4 space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Globe className="w-4 h-4 text-cyan-400" />
+                        <h4 className="text-[10px] uppercase font-mono tracking-widest text-[#00f0ff] font-bold">
+                          {lang === "en" ? "App Language" : "زمانی ئەپ"}
+                        </h4>
+                      </div>
+                      <p className="text-[10px] text-gray-500 leading-normal">
+                        {lang === "en" 
+                          ? "Select your interface language for the workspace." 
+                          : "زمانی دڵخوازی خۆت دیاریبکە بۆ ڕووکاری کارکردنی ئەپەکە."}
+                      </p>
+                      <div className="grid grid-cols-2 gap-2 pt-0.5">
+                        <button
+                          type="button"
+                          onClick={() => handleSelectLanguage("en")}
+                          className={`py-2 px-3 text-xs font-mono font-bold rounded-lg border transition-all cursor-pointer ${
+                            lang === "en" 
+                              ? "bg-cyan-950/45 text-cyan-400 border-cyan-500/40" 
+                              : "bg-[#050505] text-gray-400 border-gray-900 hover:border-gray-800"
+                          }`}
+                        >
+                          English (EN)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSelectLanguage("ckb")}
+                          className={`py-2 px-3 text-xs font-semibold rounded-lg border transition-all cursor-pointer ${
+                            lang === "ckb" 
+                              ? "bg-cyan-950/45 text-cyan-400 border-cyan-500/40" 
+                              : "bg-[#050505] text-gray-400 border-gray-900 hover:border-gray-800"
+                          }`}
+                        >
+                          کوردی (CKB)
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 2. EDIT PROFILE SECTION */}
+                    <div className="bg-[#0c0c0c] border border-gray-900 rounded-xl p-4 space-y-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsEditingMyProfile(!isEditingMyProfile);
+                          setShowAddPortfolio(false);
+                        }}
+                        className="w-full flex items-center justify-between text-left focus:outline-none"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Edit className="w-4 h-4 text-cyan-400" />
+                          <h4 className="text-[10px] uppercase font-mono tracking-widest text-[#00f0ff] font-bold">
+                            {currentT.editProfileBtn}
+                          </h4>
+                        </div>
+                        <span className="text-[10px] text-gray-500 hover:text-cyan-400 transition-colors">
+                          {isEditingMyProfile ? (lang === "en" ? "Collapse" : "کۆکردنەوە") : (lang === "en" ? "Expand" : "ڕاکێشان")}
+                        </span>
+                      </button>
+
+                      {isEditingMyProfile ? (
+                        <div className="space-y-4 pt-3 border-t border-gray-900 text-xs">
+                          <div className="space-y-1">
+                            <label className="text-gray-500 font-mono font-medium">{currentT.name}</label>
+                            <input type="text" className="w-full bg-black rounded-lg p-2.5 border border-gray-900 text-white focus:outline-none focus:border-cyan-500/40" value={editName} onChange={(e) => setEditName(e.target.value)} />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-gray-500 font-mono font-medium">{currentT.role}</label>
+                            <input type="text" className="w-full bg-black rounded-lg p-2.5 border border-gray-900 text-white focus:outline-none focus:border-cyan-500/40" value={editRole} onChange={(e) => setEditRole(e.target.value)} />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-gray-500 font-mono font-medium">{currentT.location}</label>
+                            <input type="text" className="w-full bg-black rounded-lg p-2.5 border border-gray-900 text-white focus:outline-none focus:border-cyan-500/40" value={editLocation} onChange={(e) => setEditLocation(e.target.value)} />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-gray-500 font-mono font-medium">{currentT.bioTitle}</label>
+                            <textarea className="w-full bg-black rounded-lg p-2.5 border border-gray-900 text-white focus:outline-none h-20 resize-none focus:border-cyan-500/40" value={editBio} onChange={(e) => setEditBio(e.target.value)} />
+                          </div>
+                          <div className="pt-1">
+                            <button onClick={handleSaveProfile} className="w-full py-2.5 rounded-lg text-xs bg-cyan-950 text-cyan-400 border border-cyan-800 hover:bg-cyan-900 font-mono font-semibold cursor-pointer">
+                              {currentT.saveProfileBtn}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-[10px] text-gray-500 leading-normal">
+                          {lang === "en" ? "Update your cinematic name, location, and bio description details." : "زانیاری پێناسەی خۆت نوێبکەرەوە وەک ناو، کار یان شوێن."}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* 3. ADD PORTFOLIO ASSET */}
+                    <div className="bg-[#0c0c0c] border border-gray-900 rounded-xl p-4 space-y-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowAddPortfolio(!showAddPortfolio);
+                          setIsEditingMyProfile(false);
+                        }}
+                        className="w-full flex items-center justify-between text-left focus:outline-none"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Plus className="w-4 h-4 text-cyan-400" />
+                          <h4 className="text-[10px] uppercase font-mono tracking-widest text-[#00f0ff] font-bold">
+                            {currentT.addAssetBtn}
+                          </h4>
+                        </div>
+                        <span className="text-[10px] text-gray-500 hover:text-cyan-400 transition-colors">
+                          {showAddPortfolio ? (lang === "en" ? "Collapse" : "کۆکردنەوە") : (lang === "en" ? "Expand" : "ڕاکێشان")}
+                        </span>
+                      </button>
+
+                      {showAddPortfolio ? (
+                        <div className="space-y-4 pt-3 border-t border-gray-900 text-xs">
+                          <div className="space-y-1">
+                            <label className="text-gray-500 font-mono font-medium">{currentT.assetTitle}</label>
+                            <input type="text" className="w-full bg-black rounded-lg p-2.5 border border-gray-900 text-white focus:outline-none focus:border-cyan-500/40" placeholder="Lost Neon Studio still" value={newPortTitle} onChange={(e) => setNewPortTitle(e.target.value)} />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-gray-500 font-mono font-medium">{currentT.assetUrl}</label>
+                            <input type="text" className="w-full bg-black rounded-lg p-2.5 border border-gray-900 text-white focus:outline-none focus:border-cyan-500/40" placeholder="https://images.unsplash.com/..." value={newPortUrl} onChange={(e) => setNewPortUrl(e.target.value)} />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-gray-500 font-mono font-medium">{currentT.assetDesc}</label>
+                            <input type="text" className="w-full bg-black rounded-lg p-2.5 border border-gray-900 text-white focus:outline-none focus:border-cyan-500/40" placeholder="Rec.709 color suite test" value={newPortDesc} onChange={(e) => setNewPortDesc(e.target.value)} />
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-1">
+                              <label className="text-gray-500 font-mono font-medium">{currentT.typeSelect}</label>
+                              <select className="w-full bg-black rounded-lg p-2 border border-gray-900 text-white focus:outline-none" value={newPortType} onChange={(e) => setNewPortType(e.target.value as any)}>
+                                <option value="image">{currentT.typeImage}</option>
+                                <option value="video">{currentT.typeVideo}</option>
+                              </select>
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-gray-500 font-mono font-medium">{currentT.aspectSelect}</label>
+                              <select className="w-full bg-black rounded-lg p-2 border border-gray-900 text-white focus:outline-none" value={newPortAspect} onChange={(e) => setNewPortAspect(e.target.value as any)}>
+                                <option value="landscape">{currentT.aspectL}</option>
+                                <option value="portrait">{currentT.aspectP}</option>
+                                <option value="square">{currentT.aspectS}</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          <div className="pt-2">
+                            <button onClick={handleAddPortfolioItem} className="w-full py-2.5 rounded-lg text-xs bg-cyan-950 text-cyan-400 border border-cyan-800 hover:bg-cyan-900 font-mono font-bold cursor-pointer">
+                              {currentT.addBtn}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-[10px] text-gray-500 leading-normal">
+                          {lang === "en" ? "Upload custom showreel links or high-fidelity frames to your profile." : "پڕۆژەکەت یان شوڕیڵی بەرهەمهێنانت زیاد بکە بۆ پۆرتفۆلیۆ."}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* 4. LOG OUT */}
+                    <div className="bg-[#0c0c0c] border border-gray-900 rounded-xl p-4 space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Trash2 className="w-4 h-4 text-red-500/80" />
+                        <h4 className="text-[10px] uppercase font-mono tracking-widest text-red-400 font-bold">
+                          {lang === "en" ? "Danger Zone" : "ناوچەی مەترسی"}
+                        </h4>
+                      </div>
+                      <p className="text-[10px] text-gray-500 leading-normal">
+                        {lang === "en" 
+                          ? "This will log you out from your workspace session." 
+                          : "ئەمە دەتکاتە دەرەوە لە ڕووتەختی کۆنترۆڵکردنی مەکۆکەت."}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsSettingsOpen(false);
+                          setIsRegistered(false);
+                          localStorage.removeItem("krdhub_registered");
+                          localStorage.removeItem("krdhub_auth_method");
+                          setSelectedCreatorId(null);
+                          setActiveTab("biner");
+                          showToast(lang === "en" ? "Logged out successfully" : "بە سەرکەوتوویی چوویتە دەرەوە");
+                        }}
+                        className="w-full py-2 px-3 text-xs font-mono font-bold rounded-lg border border-red-900/40 bg-red-950/15 hover:bg-red-950/30 text-red-400 transition-all cursor-pointer text-center"
+                      >
+                        {lang === "en" ? "Log Out Profile" : "لۆگ ئاوت بکە"}
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* GROUP CHAT CREATOR MODAL */}
           {showGroupModal && (
