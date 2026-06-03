@@ -1,0 +1,69 @@
+{
+  "entities": {
+    "SakoPortfolioItem": {
+      "title": "Portfolio Item",
+      "description": "An image or video sample in a creator's work portfolio.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "type": { "type": "string", "enum": ["image", "video"] },
+        "url": { "type": "string" },
+        "description": { "type": "string" },
+        "aspect": { "type": "string", "enum": ["landscape", "portrait", "square"] }
+      },
+      "required": ["id", "title", "type", "url"]
+    },
+    "SakoCreator": {
+      "title": "Creator Profile",
+      "description": "The profile card of a Kurdistani cinema creator.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "role": { "type": "string" },
+        "avatarUrl": { "type": "string" },
+        "bio": { "type": "string" },
+        "location": { "type": "string" },
+        "rating": { "type": "string" },
+        "views": { "type": "integer" },
+        "joinedDate": { "type": "string" },
+        "age": { "type": "string" },
+        "gender": { "type": "string" },
+        "email": { "type": "string" },
+        "authProvider": { "type": "string" },
+        "updatedAt": { "type": "integer" }
+      },
+      "required": ["id", "name", "role", "avatarUrl"]
+    },
+    "Movie": {
+      "title": "Cinema Work",
+      "description": "A film or video portfolio work item shared in Krd Hub.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "year": { "type": "string" },
+        "genre": { "type": "string" },
+        "description": { "type": "string" },
+        "director": { "type": "string" },
+        "rating": { "type": "string" },
+        "backdropUrl": { "type": "string" },
+        "indie": { "type": "boolean" },
+        "creatorId": { "type": "string" },
+        "createdAt": { "type": "integer" }
+      },
+      "required": ["id", "title", "generatorId"]
+    }
+  },
+  "firestore": {
+    "profiles/{profileId}": {
+      "schema": "SakoCreator",
+      "description": "Secure repository of cinema creator profiles keyed by lowercase email or uid."
+    },
+    "movies/{movieId}": {
+      "schema": "Movie",
+      "description": "Films and projects shared across the Kurdistani cinematic feed."
+    }
+  }
+}

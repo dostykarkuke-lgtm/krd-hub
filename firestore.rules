@@ -1,0 +1,70 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 1. Global Catch-All Safety Net Default-Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helper Functions ---
+    
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-\\.\\@]+$');
+    }
+
+    // Validation helper for SakoCreator
+    function isValidCreator(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 100
+        && data.role is string && data.role.size() <= 100
+        && data.avatarUrl is string && data.avatarUrl.size() <= 1000
+        && (data.bio == null || (data.bio is string && data.bio.size() <= 2000))
+        && (data.location == null || (data.location is string && data.location.size() <= 200))
+        && (data.age == null || (data.age is string && data.age.size() <= 10))
+        && (data.gender == null || (data.gender is string && data.gender.size() <= 20))
+        && (data.email == null || (data.email is string && data.email.size() <= 200));
+    }
+
+    // Validation helper for Movie
+    function isValidMovie(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.title is string && data.title.size() > 0 && data.title.size() <= 200
+        && data.description is string && data.description.size() <= 2000
+        && (data.director == null || (data.director is string && data.director.size() <= 100))
+        && (data.backdropUrl == null || (data.backdropUrl is string && data.backdropUrl.size() <= 1000))
+        && (data.creatorId == null || (data.creatorId is string && data.creatorId.size() <= 128));
+    }
+
+    // --- Firestore Collection Match Rules ---
+
+    // Profiles Collection Guard
+    match /profiles/{profileId} {
+      allow read: if true; // Any visitor can view creator profile cards
+      allow create: if isSignedIn() && isValidId(profileId) && isValidCreator(request.resource.data);
+      allow update: if isSignedIn() && isValidId(profileId) && isValidCreator(request.resource.data)
+        && (
+          // Allow self-profile updates only, checking all properties
+          request.auth.token.email.lower() == profileId.lower() || profileId == request.auth.uid
+        );
+      allow delete: if isSignedIn() && (request.auth.token.email.lower() == profileId.lower() || profileId == request.auth.uid);
+    }
+
+    // Movies Collection Guard
+    match /movies/{movieId} {
+      allow read: if true; // Anyone can read films
+      allow create: if isSignedIn() && isValidId(movieId) && isValidMovie(request.resource.data);
+      allow update: if isSignedIn() && isValidId(movieId) && isValidMovie(request.resource.data)
+        && (request.resource.data.creatorId == request.auth.uid || request.resource.data.creatorId == request.auth.token.email);
+      allow delete: if isSignedIn() && isValidId(movieId);
+    }
+  }
+}
