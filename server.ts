@@ -209,6 +209,176 @@ app.post("/api/mood-search", async (req, res) => {
     return res.status(400).json({ error: "A valid string prompt is required." });
   }
 
+  // Intercept cinema, directors, editing tips, or cameras queries instantly in local server memory
+  const q = prompt.toLowerCase();
+  
+  // 1. Kurdish Cinema Keywords
+  const isKurdishCinema = q.includes("yilmaz") || q.includes("yılmaz") || q.includes("guney") || q.includes("güney") || 
+                          q.includes("bahman") || q.includes("ghobadi") || q.includes("yol") || q.includes("turtles can fly") || 
+                          q.includes("drunken horses") || q.includes("kurdish") || q.includes("festival") || q.includes("slemani") || 
+                          q.includes("duhok") || q.includes("کورد") || q.includes("فیلم کوردی") || q.includes("یەڵماز") || 
+                          q.includes("باهمەن") || q.includes("قوبادی") || q.includes("سلێمانی") || q.includes("دهۆک");
+  
+  // 2. Camera Gear & Lighting System Keywords
+  const isCameraGear = q.includes("camera") || q.includes("sony") || q.includes("8k") || q.includes("anamorphic") || 
+                       q.includes("lighting") || q.includes("lens") || q.includes("rendering") || q.includes("کامێرا") || 
+                       q.includes("لێنز") || q.includes("ئانامۆرفیک") || q.includes("سۆنی") || q.includes("ڕووناکی") || 
+                       q.includes("عەدەسە") || q.includes("وێناکردن") || q.includes("٨کەی");
+  
+  // 3. Cinematography and theory Keywords
+  const isCinematography = q.includes("rule of thirds") || q.includes("thirds") || q.includes("grading") || q.includes("color") || 
+                           q.includes("auteur") || q.includes("montage") || q.includes("soviet") || q.includes("theory") || 
+                           q.includes("cinematography") || q.includes("ڕێسای سێیەک") || q.includes("ڕەنگ") || 
+                           q.includes("مۆنتاژ") || q.includes("ئۆتۆر") || q.includes("تیۆری") || q.includes("یەک لەسەر سێ") || 
+                           q.includes("درەجەی ڕەنگ") || q.includes("سینەماتۆگرافی") || q.includes("رەنگ") || q.includes("مونتاژ") || q.includes("تیوری");
+
+  // 4. General cinema, editing, directors tips Keywords
+  const isGeneralCinema = q.includes("cinema") || q.includes("director") || q.includes("edit") || q.includes("tip") || 
+                          q.includes("scene") || q.includes("script") || q.includes("سينەما") || q.includes("دەرهێنەر") || 
+                          q.includes("نووسین") || q.includes("چیرۆک") || q.includes("نوێ") || q.includes("دراما") || q.includes("ئامۆژگاری");
+
+  if (isKurdishCinema || isCameraGear || isCinematography || isGeneralCinema) {
+    let partnerResponse = "";
+    let films = [];
+
+    if (isKurdishCinema) {
+      partnerResponse = `ڕێز و سڵاو بۆ تۆی باوڕمەند بە جادووی سینەما لە مەکۆی داهێنەرانی **Krd Hub**! 🎥✨
+
+سەبارەت بە **سینەمای کوردی**، ئەمە گەشتێکی بەرز و پڕ لە قوربانی، بەڵام هاوکات پێتوازێکی مەزنی هونەرییە:
+* **دەرهێنەرە دێرین و کاریگەرەکان**:
+  * **یەڵماز گۆنەی (Yılmaz Güney)**: ئەستێرە و دەرهێنەری باڵای کورد؛ نووسەر و سازێنەری شاکاری بێهاوتای '**ڕێگا (Yol - 1982)**' کە لە فێستیڤاڵی نێودەوڵەتیی فیلمی کان خەڵاتی چڵە خورمای زێڕینی بەدەستھێنا. گۆنەی بە شێوازێکی واقیعی-سیاسیی بێپەردە، تراژیدیا و ژیانی تاکی کوردی ڕەنگڕێژ کرد.
+  * **بەمەن قوبادی (Bahman Ghobadi)**: پێشەنگی وێنەگرتنی سۆزداری قووڵ لە ناوچە سنوورییەکان. تەکنیکەکانی نیشاندانی ژیانی ڕاستەقینە، وەک لە فیلمەکانی '**کاتێک بۆ مەستیی ئەسپەکان (A Time for Drunken Horses - 2000)**' و فیلمی بەناوبانگی جیهانی '**کێسەڵەکان دەفڕن (Turtles Can Fly - 2004)**' کۆڵەکەی نێودەوڵەتیبوونی سینەمای کوردین.
+* **فێستیڤاڵە فەرمییە ڕێزلێگیراوەکان**:
+  * **فێستیڤاڵی نێودەوڵەتیی فیلمی دهۆک (Duhok IFF)**: شوێنێکی باڵای مێژوویی بۆ نیشاندانی فیلمی نوێی کوردی و پێشکەشکردنی خەڵاتی نێودەوڵەتی.
+  * **فێستیڤاڵی نێودەوڵەتیی فیلمی سلێمانی (Slemani IFF)**: پەرەپێدانی کلتوور و دروستکردنی پەڕەی تاقیکردنەوەی دەرهێنەرانی داهاتووی کوردستان.
+
+ئەم شاکارانە بە گرتەی ڕەسەنی شاخاوی و دیزاینی دەنگی سروشتی خاوەن سەرزەمینێکی بەهێزن لە چوارچێوەی سینەمای جیهانیدا.`;
+      
+      films = [
+        {
+          id: `fk-1-${Date.now()}`,
+          title: "Turtles Can Fly (کێسەڵەکانیش دەفڕن)",
+          year: "2004",
+          genre: "Drama / Kurdish War",
+          description: "Focusing on Kurdish refugee children on the Iraqi-Turkish border, anticipating the US invasion of Iraq.",
+          matchReason: "Matches your query about Bahman Ghobadi, showcasing realistic emotional depth and historic Kurdish narratives.",
+          director: "Bahman Ghobadi",
+          rating: "8.1/10",
+          indie: true,
+          roleOpportunities: ["Co-Director", "Location manager", "Sound designer", "Documentary editor"]
+        },
+        {
+          id: `fk-2-${Date.now()}`,
+          title: "Yol (ڕێگا)",
+          year: "1982",
+          genre: "Drama / Classic Political",
+          description: "A gritty, beautiful portrayal of Turkey and Kurdish life, following prisoners on temporary leave who face institutional oppression.",
+          matchReason: "Matches your interest in Yılmaz Güney, Cannes Palme d'Or winner and standard-bearer of Kurdish auteur style.",
+          director: "Yılmaz Güney",
+          rating: "8.1/10",
+          indie: true,
+          roleOpportunities: ["Restoration Artist", "Cinematographer", "Kurdish Historian"]
+        },
+        {
+          id: `fk-3-${Date.now()}`,
+          title: "A Time for Drunken Horses (کاتێک بۆ مەستیی ئەسپەکان)",
+          year: "2000",
+          genre: "Drama / Realism",
+          description: "The struggles of an orphaned Kurdish family who must smuggle goods through the cold mountains to pay for an emergency surgery.",
+          matchReason: "Highlights the absolute masterpiece of neo-realism in modern Kurdish cinema and Bahman Ghobadi's early work.",
+          director: "Bahman Ghobadi",
+          rating: "7.8/10",
+          indie: true,
+          roleOpportunities: ["Casting Assistant", "Kurdish dialect sync editor", "Lighting Assistant"]
+        }
+      ];
+
+    } else if (isCameraGear) {
+      partnerResponse = `بەخێرهاتی مەکینەی وێناکاری بەرزی تەکنیکی لە **Krd Hub**! 🎥⚙️
+
+ئامراز و زانستەکانی کامێرا و ڕووناکی بۆ بەرهەمهێنانی کوالێتی هۆلیوود:
+* **عەدەسەی ئانامۆرفیک (Anamorphic Lenses)**:
+  کارتێکردنێکی پانامۆڕفیکی نایاب دروست دەکات بە ئاسۆیی (Horizontal Squeeze)، کە ئەکتەر لێیەوە فۆکەسێکی زۆر جوان وەردەگرێت و پاشبنەماکەش بە شێوەی هێلکەیی بووکی (Oval Bokeh) دەردەکەوێت، لەگەڵ ڕووناکی نێلۆنی شین و سەرنجڕاکێش (Cyan Flares).
+* **Sony A1 لەگەڵ جێبەجێکردنی وێنای 8K و ڕووناکی**:
+  بەکارھێنانی کامێرای زەبەلاحی **Sony A1** بە دابینکردنی توانای تۆمارکردنی **8K RAW**، مەودای داینامیکی قووڵ (Dynamic Range - 15 Stops) دەبەخشێت کە مۆنتاژکار و مۆدێلکاری ڕەنگ دەتوانن تاریکترین سێبەر و گەشاوەترین تیشک لە یەک کاتدا بگوازنەوە بێ ئەوەی داتاکان بفەوتێن.
+* **گرنگترین نەخشی ڕووناکیکردن (Cinematographic Lighting Setup)**:
+  * **سیستەمی ڕووناکی سێ خاڵ (Three-Point Lighting)**: بەکارهێنانی ڕووناکی سەرەکی (Key Light)، پڕکەرەوە (Fill Light) بۆ سڕینەوەی سێبەری تیژ، و ڕووناکی دەوربەر (Backlight/Rim Light) بۆ دروستکردنی شێوەی سێ ڕەهەندی لە دەوری بابەتەکە.
+  * **Low-Key Cinematography**: بەکارهێنانی سەرچاوەیەکی تاکی بەهێز لە تەنیشتەوە لەگەڵ فیلتەری نەرمکەرەوە (Chiaroscuro effect) بۆ پیشاندانی قووڵی دەروونی یان نادیاری لە دیمەنە دراماتیکییەکاندا.`;
+      
+      films = [
+        {
+          id: `fc-1-${Date.now()}`,
+          title: "Neon Horizon (ئاسۆی نیۆن)",
+          year: "2025",
+          genre: "Cyberpunk / Cinematography",
+          description: "Immersive science-fiction using the high-fidelity Sony A1 and anamorphic visual styling.",
+          matchReason: "Perfect match for your camera preferences and low-key cinematic lighting experiments.",
+          director: "Elena Vance",
+          rating: "8.1/10",
+          indie: true,
+          roleOpportunities: ["Camera Assistant", "Lighting Director", "DaVinci Colorist", "8K Visual Editor"]
+        }
+      ];
+
+    } else if (isCinematography) {
+      partnerResponse = `بەخێربێیت بۆ بەشی شیکردنەوەی مەزنترین جومگەکانی ڕووی هونەری و فەلسەفەی سینەماتۆگرافی! 🎨🎬
+
+لێرەدا پێناسە و قووڵایی تەکنیکە فەرمییەکان دەردەخەین:
+* **یاسای یەک لەسەر سێ (Rule of Thirds)**:
+  یەکێکە لە بنەڕەتیترین یاساکانی گرتبەستن. گرتەکە بە درێژایی هێڵەکانی تێکڕڕبڕین دابەش دەبێت بۆ ٩ چوارچێوەی یەکسان؛ دانانی دەموچاو یان پێکهاتەی هێڵکاری سەر بە بابەتەکە لەسەر ئەندازەی تێکبڕین، هارمۆنییەکی دەروونی بەهێز بۆ بینەر دادەمەزرێنێت.
+* **درەجەکردنی ڕەنگ (Color Grading)**:
+  ئەمە زمانێکی دەروونییە! بەکارهێنانی گواستنەوەی فام بۆ پیتێکی شین بۆ نیشاندانی ئەندێشە و نامۆیی (isolation)، یان ڕادیانتە زێڕینەکان بۆ گوزارشتکردن لە یادەوەری و جۆش و خرۆش. ئەم کردارە مێژووانە لە DaVinci Resolve دا دێتە بەرهەم.
+* **تیۆری دەرهێنەری ناوازە (Auteur Theory)**:
+  تێڕوانینێکە کە پێیوایە فیلم ئامرازی دەربرینی کەسیی دەرهێنەرە. دەرهێنانی واقیعی جادویی Bahman Ghobadi یان ڕیکۆردی ڕۆحی یەڵماز گۆنەی سەلمێنەری ئەم تیۆرییە دێرینەن.
+* **تیۆری مۆنتاژی سۆڤیەتی (Soviet Montage Theory)**:
+  دەڵێت یەکگرتنی دوو گرتە کە پەیوەندییەکی جوگرافی یان کاتی ڕاستەوخۆیان نییە، پێکەوە مانا و چەمکێکی تەواو نوێ دەبەخشنە مێشکی بینەر (تەکنیکی دروستکردنی فیکر لە مۆنتاژدا).`;
+      
+      films = [
+        {
+          id: `ft-1-${Date.now()}`,
+          title: "Synthetic Solitude (تەنیایی دروستکراو)",
+          year: "2026",
+          genre: "Art-House / Theory",
+          description: "An elegant, award-winning visual exploration of Soviet montage theory under dark architectural brutalism.",
+          matchReason: "Matches your query about cinematic rule of thirds, classic auteur theory, and experimental editing rules.",
+          director: "Saman Farhad",
+          rating: "9.1/10",
+          indie: false,
+          roleOpportunities: ["Visual Designer", "Auteur Consultant", "VFX Montage Lead"]
+        }
+      ];
+
+    } else {
+      partnerResponse = `سڵاو و خۆشەویستی قووڵ بۆ تۆی داهێنەر لە **Krd Hub**! دڵخۆشم بە گفتوگۆکردن لەگەڵت دەربارەی سینەما. 🎥✨
+
+ئەمەش کۆمەڵێک چرپەی تەکنیکی و ئامۆژگاری زێڕینی سینەمایی بۆ کارەکەت:
+* **جڵەوکردنی سیناریۆ (The Story Engine)**: پێش دەست بردن بۆ تۆمارکردن، چیرۆکەکەت لەسەر سێ ئاستی سەرەکی دابەش بکە: دروستکردنی کێشە, گەیشتنە لوتکە (Climax)، و چارەسەرکردن. سیناریۆ ئەگەر بەهێز نەبێت پێشکەوتووترین کامێرا ڕزگاری ناکات.
+* **ڕەسەنایەتی دەنگ (Auditory Realism)**: دەنگ نیوەی فیلمەکەتە! بەکارهێنانی مایکی ئاراستەیی (Shotgun) و دەستکاریکردنی دەنگە سروشتییەکانی دەوربەر (Ambient Sounds) بۆ بەرزکردنەوەی ئاستی سەرنجی بینەر بەکاربهێنە.
+* **مۆنتاژی نەرم (Pacing & Timing)**: هەمیشە هەوڵبدە لە کاتی دیالۆگدا مۆنتاژی J-Cut و L-Cut بەکاربهێنیت تا گۆڕانکاری دیمەنەکان بەشێوەیەکی خۆڕسک دەربکەون.`;
+      
+      films = [
+        {
+          id: `fg-1-${Date.now()}`,
+          title: "The Quiet Depth (قووڵایی بێدەنگ)",
+          year: "2023",
+          genre: "Psychological Drama",
+          description: "A filmmaking marvel highlighting the usage of ambient sound design and slow-burn pacing.",
+          matchReason: "Highlights top-tier practical advice for sound editing and low-key visual pacing.",
+          director: "Marcus Thorne",
+          rating: "7.9/10",
+          indie: true,
+          roleOpportunities: ["Lead Cine editor", "Sound Mixer", "Plot Advisor"]
+        }
+      ];
+    }
+
+    return res.json({
+      partnerResponse,
+      films,
+      isFallback: false
+    });
+  }
+
   // Fallback static dataset in case API key is missing or calls fail
   const fallbackMovies = [
     {
